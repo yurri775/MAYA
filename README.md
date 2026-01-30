@@ -16,6 +16,8 @@
 - 🖼️ **Grilles artistiques** avec design professionnel
 - ⚡ **Traitement rapide** avec optimisations OpenCV
 - 📈 **Métriques détaillées** : vitesse, temps restant, taux de succès
+- 📁 **Échantillons de démonstration** prêts à présenter
+- 🔬 **Basé sur SynMorph** (arXiv:2409.05595) - recherche de pointe 2024
 
 ## 🚀 Installation
 
@@ -53,10 +55,18 @@ CREATE_GRID = True        # Créer une grille artistique
 
 ```
 moprh/
-├── morph1.ipynb              # Notebook principal
+├── morph1.ipynb              # Notebook principal amélioré
+├── generate_samples.py       # Script de génération d'échantillons
 ├── README.md                 # Ce fichier
+├── SYNMORPH_FEATURES.md      # Documentation des fonctionnalités SynMorph
 ├── .gitignore               # Fichiers ignorés par git
-├── morphing_results/        # Images générées (non versionnées)
+├── sample_data/             # 📊 Échantillons de démonstration
+│   ├── before_morph/        # Images originales (paires A & B)
+│   ├── after_morph/         # Images morphées
+│   ├── morph_comparison/    # Comparaisons côte-à-côte
+│   ├── gifs_demo/           # Animations GIF
+│   └── README.md            # Documentation des échantillons
+├── morphing_results/        # Résultats de génération (non versionnés)
 │   ├── gifs/               # GIFs animés
 │   └── grids/              # Grilles artistiques
 └── dlib_models/            # Modèles de détection (non versionnés)
@@ -68,6 +78,22 @@ Le programme génère :
 - **Images individuelles** : morphings sauvegardés séparément
 - **GIFs animés** : transitions fluides entre visages
 - **Grilles artistiques** : compilation esthétique des résultats
+
+## 📊 Échantillons de Démonstration
+
+Le dossier `sample_data/` contient des échantillons prêts à présenter :
+- ✅ **5 paires d'images originales** (10 images au total)
+- ✅ **5 images morphées** montrant le résultat final
+- ✅ **5 comparaisons côte-à-côte** pour visualisation facile
+- ✅ **Documentation complète** expliquant chaque étape
+
+### Génération de Nouveaux Échantillons
+
+```bash
+python generate_samples.py
+```
+
+Cela créera automatiquement 5 nouveaux échantillons de démonstration dans `sample_data/`.
 
 ## 📊 Métriques en Temps Réel
 
@@ -121,6 +147,17 @@ Les contributions sont les bienvenues ! N'hésitez pas à :
 - 🐛 Signaler des bugs
 - 💡 Proposer de nouvelles fonctionnalités
 - 📝 Améliorer la documentation
+
+## 🔬 Recherche et Références
+
+Ce projet s'inspire des techniques décrites dans le papier de recherche :
+
+**SynMorph: Generating Synthetic Face Morphing Dataset with Mated Samples**
+- 📄 arXiv:2409.05595v1 [cs.CV] - 9 Septembre 2024
+- 👥 Auteurs : Haoyu Zhang, Raghavendra Ramachandra, Kiran Raja, Christoph Busch
+- 🏫 Norwegian University of Science and Technology (NTNU), Darmstadt University of Applied Sciences
+
+Pour plus de détails sur les fonctionnalités du papier et leur intégration dans ce projet, consultez [SYNMORPH_FEATURES.md](SYNMORPH_FEATURES.md).
 
 ## 📜 Licence
 
