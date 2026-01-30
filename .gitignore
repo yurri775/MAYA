@@ -31,3 +31,6 @@ desktop.ini
 
 # Données scikit-learn
 scikit_learn_data/
+"dataset/*.png" 
+"dataset/*.jpg" 
+"dataset/*.jpeg" 
