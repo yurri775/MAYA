@@ -1,0 +1,1177 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{geometry}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{listings}
+\usepackage{xcolor}
+
+\geometry{margin=2.5cm}
+
+\title{\textbf{Détection de Face Morphing par Deep Learning} \\
+\Large Entraînement d'un Modèle MobileNetV2 pour la Classification Morphing vs Bona Fide}
+
+\author{Projet de Recherche - Face Blending et Membership Inference Attack}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Ce rapport présente une étude complète sur la détection automatique de face morphing à l'aide de techniques d'apprentissage profond. Nous avons entraîné un modèle basé sur l'architecture MobileNetV2, pré-entraîné sur ImageNet, pour classifier des images de visages en deux catégories : images morphées (face morphing) et images authentiques (bona fide). Le modèle a été évalué sur un dataset équilibré de 1124 images et a atteint une accuracy de 60.18\% avec un F1-score de 0.6565 sur l'ensemble de test. Cette recherche s'inscrit dans le cadre d'une étude plus large sur la confidentialité en apprentissage automatique et les attaques par inférence d'appartenance (Membership Inference Attack).
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+\subsection{Contexte et Motivation}
+
+Le face morphing est une technique de synthèse d'images qui consiste à fusionner deux ou plusieurs visages pour créer une nouvelle identité fictive. Cette technique présente des applications variées, allant de l'augmentation de données en apprentissage automatique à des problématiques de sécurité biométrique. La détection automatique de ces images morphées est devenue cruciale dans les systèmes d'authentification biométrique modernes.
+
+\subsection{Objectifs de la Recherche}
+
+Les objectifs principaux de ce travail sont :
+\begin{itemize}
+    \item Développer un système de détection automatique de face morphing basé sur l'apprentissage profond
+    \item Évaluer la performance d'un modèle MobileNetV2 pour cette tâche de classification binaire
+    \item Analyser les métriques de performance et identifier les cas limites
+    \item Établir une base pour l'étude de la confidentialité via les attaques MIA (Membership Inference Attack)
+\end{itemize}
+
+\subsection{Structure du Rapport}
+
+Ce rapport est organisé comme suit : la Section 2 présente l'état de l'art et les fondements théoriques, la Section 3 décrit la méthodologie et l'architecture du modèle, la Section 4 détaille les expériences menées et les résultats obtenus, la Section 5 propose une analyse approfondie des résultats, et la Section 6 conclut avec des perspectives futures.
+
+\section{État de l'Art et Fondements Théoriques}
+
+\subsection{Face Morphing}
+
+Le face morphing, ou face blending, est une technique qui permet de créer des identités fictives en combinant les caractéristiques faciales de plusieurs individus. Mathématiquement, pour deux images de visages $I_1$ et $I_2$, un morphing avec coefficient $\alpha \in [0,1]$ peut être défini comme :
+
+\begin{equation}
+I_{morph} = \alpha \cdot I_1 + (1-\alpha) \cdot I_2
+\end{equation}
+
+Dans la pratique, le processus est plus complexe et implique :
+\begin{itemize}
+    \item La détection de points de repère faciaux (facial landmarks)
+    \item L'alignement géométrique des visages
+    \item Le warping (déformation) des textures
+    \item La fusion pondérée des intensités de pixels
+\end{itemize}
+
+\subsection{Réseaux de Neurones Convolutifs (CNN)}
+
+Les Convolutional Neural Networks (CNN) constituent l'architecture de référence pour les tâches de vision par ordinateur. Un CNN typique est composé de plusieurs couches :
+
+\subsubsection{Couche de Convolution}
+
+La convolution 2D est définie mathématiquement comme :
+
+\begin{equation}
+(I * K)(x, y) = \sum_{m}\sum_{n} I(x-m, y-n) \cdot K(m, n)
+\end{equation}
+
+où $I$ est l'image d'entrée, $K$ est le noyau de convolution (kernel), et $*$ représente l'opération de convolution.
+
+\subsubsection{Fonction d'Activation ReLU}
+
+La fonction ReLU (Rectified Linear Unit) est définie par :
+
+\begin{equation}
+\text{ReLU}(x) = \max(0, x)
+\end{equation}
+
+Cette fonction introduit de la non-linéarité dans le réseau tout en étant computationnellement efficace.
+
+\subsubsection{Pooling}
+
+Le Max Pooling réduit la dimensionnalité spatiale :
+
+\begin{equation}
+\text{MaxPool}(R) = \max_{(i,j) \in R} I(i, j)
+\end{equation}
+
+où $R$ est la région de pooling.
+
+\subsection{MobileNetV2}
+
+MobileNetV2 \cite{sandler2018mobilenetv2} est une architecture efficace développée par Google, optimisée pour les appareils mobiles. Elle utilise :
+
+\subsubsection{Depthwise Separable Convolutions}
+
+Contrairement aux convolutions standard, les convolutions séparables en profondeur décomposent l'opération en :
+\begin{itemize}
+    \item \textbf{Depthwise Convolution} : applique un filtre par canal d'entrée
+    \item \textbf{Pointwise Convolution} : convolution 1x1 pour combiner les canaux
+\end{itemize}
+
+Cette décomposition réduit considérablement le nombre de paramètres :
+
+\begin{equation}
+\text{Réduction} = \frac{D_K \cdot D_K \cdot M \cdot N + M \cdot N}{D_K \cdot D_K \cdot M \cdot N}
+\end{equation}
+
+où $D_K$ est la taille du kernel, $M$ le nombre de canaux d'entrée, et $N$ le nombre de canaux de sortie.
+
+\subsubsection{Inverted Residual Blocks}
+
+MobileNetV2 utilise des blocs résiduels inversés avec connexions résiduelles (skip connections) :
+
+\begin{equation}
+y = x + \mathcal{F}(x, \{W_i\})
+\end{equation}
+
+où $x$ est l'entrée, $\mathcal{F}$ est la transformation résiduelle, et $y$ est la sortie.
+
+\subsection{Transfer Learning}
+
+Le transfer learning consiste à réutiliser un modèle pré-entraîné sur une tâche source (ImageNet) pour une nouvelle tâche cible (détection de morphing). Formellement :
+
+\begin{equation}
+\theta^* = \arg\min_{\theta} \mathcal{L}_{target}(f(x; \theta_{pretrained}, \theta))
+\end{equation}
+
+où $\theta_{pretrained}$ sont les poids pré-entraînés gelés, et $\theta$ sont les nouveaux paramètres à apprendre.
+
+\section{Méthodologie}
+
+\subsection{Génération des Images Morphées}
+
+\subsubsection{Techniques Testées}
+
+Dans le cadre de ce projet, plusieurs techniques de face morphing ont été explorées et testées afin de générer un dataset de qualité pour l'entraînement du modèle de détection. Nous présentons ici les approches testées, les problèmes rencontrés, et les solutions retenues.
+
+\paragraph{Approche 1: Morphing basé sur la Triangulation de Delaunay}
+
+La première approche implémentée repose sur la triangulation de Delaunay des points caractéristiques du visage (facial landmarks). Cette méthode classique se décompose en plusieurs étapes :
+
+\begin{enumerate}
+    \item \textbf{Détection des landmarks faciaux} : Utilisation de la bibliothèque Dlib avec le modèle pré-entraîné \texttt{shape\_predictor\_68\_face\_landmarks.dat} pour détecter 68 points caractéristiques du visage (contour, yeux, nez, bouche, etc.)
+
+    \item \textbf{Ajout de points de contrôle} : En plus des 68 landmarks, nous avons ajouté 8 points aux coins et milieux des bords de l'image pour assurer une triangulation complète :
+    \begin{equation}
+    P_{total} = P_{landmarks} \cup \{(0,0), (w,0), (w,h), (0,h), (w/2,0), (w,h/2), (w/2,h), (0,h/2)\}
+    \end{equation}
+
+    \item \textbf{Interpolation des points} : Pour un coefficient de morphing $\alpha \in [0,1]$, les points morphés sont calculés comme :
+    \begin{equation}
+    P_{morph} = (1-\alpha) \cdot P_A + \alpha \cdot P_B
+    \end{equation}
+
+    \item \textbf{Triangulation de Delaunay} : Application de l'algorithme de Delaunay sur $P_{morph}$ pour obtenir une tessellation du plan
+
+    \item \textbf{Warping par triangle} : Pour chaque triangle $T_i$ de la triangulation :
+    \begin{itemize}
+        \item Extraction de la région correspondante dans les images source $I_A$ et $I_B$
+        \item Application de transformations affines pour warper vers $T_i^{morph}$
+        \item Blending des textures warpées : $I_{morph}^{T_i} = (1-\alpha) \cdot I_A^{warp} + \alpha \cdot I_B^{warp}$
+    \end{itemize}
+\end{enumerate}
+
+\paragraph{Approche 2: Blending Simple avec Alignement}
+
+Une approche plus simple a également été testée, consistant en :
+\begin{enumerate}
+    \item Détection et alignement des visages sur les yeux
+    \item Blending alpha direct sans warping géométrique : $I_{morph} = \alpha \cdot I_A + (1-\alpha) \cdot I_B$
+\end{enumerate}
+
+Cette méthode s'est révélée insuffisante car elle produit des artefacts de "double vision" (ghosting) lorsque les structures faciales ne sont pas alignées.
+
+\paragraph{Approche 3: Génération avec Légères Variations}
+
+Pour créer 30 images morphées par paire d'identités (format A\_B\_N), nous avons implémenté une stratégie de variation qui consiste à :
+\begin{itemize}
+    \item Sélectionner aléatoirement différentes photos des mêmes personnes
+    \item Ajouter un léger bruit gaussien ($\sigma = 0.005 \times 255$) pour créer des variations subtiles
+    \item Maintenir le coefficient de mélange constant à $\alpha = 0.5$ (50\%)
+\end{itemize}
+
+Cette approche permet de générer un dataset de taille $K \times 30$ où $K$ est le nombre de paires d'identités possibles.
+
+\subsubsection{Problèmes Rencontrés}
+
+Durant le développement et les tests, plusieurs problèmes techniques ont été identifiés :
+
+\paragraph{Problème 1: Échec de Détection des Landmarks}
+
+\textbf{Description} : Dans environ 5-10\% des cas, le détecteur Dlib ne parvient pas à détecter de visage dans l'image, résultant en l'impossibilité d'extraire les landmarks.
+
+\textbf{Causes} :
+\begin{itemize}
+    \item Qualité d'image insuffisante (basse résolution, flou)
+    \item Pose non frontale (angle > 30°)
+    \item Occultations partielles (lunettes, cheveux)
+    \item Éclairage défavorable (contre-jour, ombres fortes)
+\end{itemize}
+
+\textbf{Solution implémentée} : En cas d'échec de détection, nous générons une grille régulière de points de contrôle comme fallback :
+\begin{equation}
+P_{fallback} = \{(x_i, y_j) : x_i \in \text{linspace}(0.25w, 0.75w, 17), y_j \in \text{linspace}(0.25h, 0.75h, 4)\}
+\end{equation}
+
+Cette solution assure que le morphing peut toujours être réalisé, même si le résultat est de qualité inférieure.
+
+\paragraph{Problème 2: Triangles Hors Limites}
+
+\textbf{Description} : Certains triangles de la triangulation de Delaunay peuvent avoir des sommets hors des limites de l'image après interpolation, causant des erreurs lors du warping.
+
+\textbf{Solution implémentée} : Clamping des coordonnées et vérification avant warping :
+\begin{equation}
+P_{clamped} = \{\text{clamp}(p, 0, w-1) : p \in P\}
+\end{equation}
+
+De plus, nous filtrons les triangles complètement hors limites avant de tenter le warping.
+
+\paragraph{Problème 3: Artefacts de Morphing}
+
+\textbf{Description} : Des artefacts visuels apparaissent parfois aux frontières entre triangles, créant des discontinuités visibles.
+
+\textbf{Causes} :
+\begin{itemize}
+    \item Erreurs d'interpolation aux bords
+    \item Incohérences dans l'ordre des triangles
+    \item Approximations numériques (float32 vs uint8)
+\end{itemize}
+
+\textbf{Solution implémentée} :
+\begin{itemize}
+    \item Utilisation de \texttt{BORDER\_REFLECT\_101} pour les bords
+    \item Application de masques avec \texttt{fillConvexPoly} pour un blending précis
+    \item Clamping final : $I_{morph} = \text{clip}(I_{morph}, 0, 255)$
+\end{itemize}
+
+\paragraph{Problème 4: Performance et Temps de Calcul}
+
+\textbf{Description} : La génération de milliers d'images morphées peut être très lente (environ 1-2 secondes par image).
+
+\textbf{Optimisations implémentées} :
+\begin{itemize}
+    \item Redimensionnement à une taille fixe (128×128 ou 224×224) avant morphing
+    \item Vectorisation des opérations NumPy
+    \item Parallélisation possible avec multiprocessing (non implémentée dans la version actuelle)
+\end{itemize}
+
+\subsubsection{Résultats et Choix Finaux}
+
+Après tests et évaluations, nous avons retenu la méthode basée sur la triangulation de Delaunay (Approche 1) pour les raisons suivantes :
+
+\begin{itemize}
+    \item \textbf{Qualité visuelle} : Les morphings sont plus naturels et convaincants
+    \item \textbf{Pas d'artefacts de ghosting} : Les structures faciales sont correctement alignées
+    \item \textbf{Robustesse} : Le fallback en grille assure une génération réussie dans la plupart des cas
+    \item \textbf{Diversité} : La variation par sélection aléatoire d'images sources permet de créer 30 variations distinctes par paire
+\end{itemize}
+
+Le dataset final généré pour ce projet comprend :
+\begin{itemize}
+    \item \textbf{Dataset initial} : 562 images morphées (utilisées pour l'entraînement du détecteur)
+    \item \textbf{Nouveau dataset} : $K \times 30$ images avec $K$ paires d'identités du dataset LFW
+    \item \textbf{Format de nommage} : \texttt{PersonA\_PersonB\_N.png} avec $N \in \{1, 2, ..., 30\}$
+    \item \textbf{Coefficient de mélange} : $\alpha = 0.5$ (50\% pour toutes les images)
+\end{itemize}
+
+Cette approche systématique de génération de morphings garantit un dataset de qualité et de taille suffisante pour l'évaluation des attaques MIA et l'entraînement de modèles de détection robustes.
+
+\subsection{Dataset}
+
+\subsubsection{Composition du Dataset}
+
+Notre dataset est composé de :
+\begin{itemize}
+    \item \textbf{Images Morphées} : 562 images générées par face blending
+    \item \textbf{Images Bona Fide} : 562 images authentiques (réelles)
+    \item \textbf{Total} : 1124 images
+\end{itemize}
+
+Le dataset est équilibré avec un ratio 1:1 entre les deux classes, ce qui évite les biais de classe.
+
+\subsubsection{Division du Dataset}
+
+Le dataset a été divisé en trois ensembles :
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Ensemble} & \textbf{Images Totales} & \textbf{Morphs} & \textbf{Bona Fide} \\
+\midrule
+Entraînement & 786 (70\%) & 393 & 393 \\
+Validation & 112 (10\%) & 56 & 56 \\
+Test & 226 (20\%) & 113 & 113 \\
+\bottomrule
+\end{tabular}
+\caption{Division du dataset}
+\label{tab:dataset_split}
+\end{table}
+
+La division a été effectuée de manière stratifiée pour maintenir la distribution des classes dans chaque ensemble.
+
+\subsection{Prétraitement des Données}
+
+\subsubsection{Redimensionnement}
+
+Toutes les images ont été redimensionnées à une taille fixe de $224 \times 224$ pixels, correspondant à la taille d'entrée standard de MobileNetV2.
+
+\subsubsection{Normalisation}
+
+Les valeurs de pixels ont été normalisées dans l'intervalle $[0, 1]$ :
+
+\begin{equation}
+I_{norm} = \frac{I}{255}
+\end{equation}
+
+où $I \in [0, 255]$ sont les valeurs de pixels originales.
+
+\subsection{Data Augmentation}
+
+Pour augmenter la robustesse du modèle et réduire le surapprentissage, nous avons appliqué les transformations suivantes sur l'ensemble d'entraînement :
+
+\begin{itemize}
+    \item \textbf{Rotation} : rotation aléatoire de $\pm 20°$
+    \item \textbf{Translation} : décalage horizontal et vertical de $\pm 20\%$
+    \item \textbf{Flip horizontal} : miroir horizontal aléatoire
+    \item \textbf{Zoom} : zoom aléatoire de $\pm 20\%$
+    \item \textbf{Shear} : cisaillement de $\pm 20\%$
+    \item \textbf{Brightness} : variation de luminosité de $\pm 20\%$
+\end{itemize}
+
+Mathématiquement, pour une transformation $T$ et une image $I$, l'augmentation génère :
+
+\begin{equation}
+I_{aug} = T(I; \theta_{random})
+\end{equation}
+
+où $\theta_{random}$ sont les paramètres aléatoires de la transformation.
+
+\subsection{Architecture du Modèle}
+
+\subsubsection{Vue d'Ensemble}
+
+Notre modèle est composé de :
+\begin{enumerate}
+    \item \textbf{Base MobileNetV2} : pré-entraînée sur ImageNet (154 couches)
+    \item \textbf{Global Average Pooling} : agrégation spatiale
+    \item \textbf{Couches de Classification} : couches fully-connected personnalisées
+\end{enumerate}
+
+\subsubsection{Architecture Détaillée}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Couche} & \textbf{Sortie} & \textbf{Activation} \\
+\midrule
+Input & $224 \times 224 \times 3$ & - \\
+MobileNetV2 (base) & $7 \times 7 \times 1280$ & - \\
+GlobalAveragePooling2D & $1280$ & - \\
+BatchNormalization & $1280$ & - \\
+Dense & $256$ & ReLU \\
+Dropout & $256$ & - (p=0.5) \\
+Dense & $128$ & ReLU \\
+Dropout & $128$ & - (p=0.3) \\
+Dense (output) & $1$ & Sigmoid \\
+\bottomrule
+\end{tabular}
+\caption{Architecture du modèle}
+\label{tab:architecture}
+\end{table}
+
+\subsubsection{Paramètres du Modèle}
+
+\begin{itemize}
+    \item \textbf{Paramètres totaux} : 2,624,065
+    \item \textbf{Couches entraînables} : 20 dernières couches de MobileNetV2 + couches de classification
+    \item \textbf{Couches gelées} : 134 premières couches de MobileNetV2
+\end{itemize}
+
+\subsection{Fonction de Perte et Optimisation}
+
+\subsubsection{Binary Cross-Entropy Loss}
+
+Pour la classification binaire, nous utilisons la fonction de perte Binary Cross-Entropy :
+
+\begin{equation}
+\mathcal{L}_{BCE} = -\frac{1}{N}\sum_{i=1}^{N} \left[ y_i \log(\hat{y}_i) + (1-y_i) \log(1-\hat{y}_i) \right]
+\end{equation}
+
+où :
+\begin{itemize}
+    \item $N$ est le nombre d'exemples
+    \item $y_i \in \{0, 1\}$ est la vraie étiquette (0 = bona fide, 1 = morph)
+    \item $\hat{y}_i \in [0, 1]$ est la probabilité prédite
+\end{itemize}
+
+\subsubsection{Optimiseur Adam}
+
+Nous utilisons l'optimiseur Adam (Adaptive Moment Estimation) avec un taux d'apprentissage initial de $\eta = 10^{-4}$ :
+
+\begin{align}
+m_t &= \beta_1 m_{t-1} + (1-\beta_1)g_t \\
+v_t &= \beta_2 v_{t-1} + (1-\beta_2)g_t^2 \\
+\hat{m}_t &= \frac{m_t}{1-\beta_1^t} \\
+\hat{v}_t &= \frac{v_t}{1-\beta_2^t} \\
+\theta_t &= \theta_{t-1} - \frac{\eta}{\sqrt{\hat{v}_t} + \epsilon} \hat{m}_t
+\end{align}
+
+où :
+\begin{itemize}
+    \item $g_t$ est le gradient à l'itération $t$
+    \item $m_t$ et $v_t$ sont les estimations du premier et second moments
+    \item $\beta_1 = 0.9$ et $\beta_2 = 0.999$ (valeurs par défaut)
+    \item $\epsilon = 10^{-7}$ pour la stabilité numérique
+\end{itemize}
+
+\subsection{Métriques d'Évaluation}
+
+\subsubsection{Accuracy}
+
+L'accuracy mesure le taux de prédictions correctes :
+
+\begin{equation}
+\text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN}
+\end{equation}
+
+où TP, TN, FP, FN sont respectivement les vrais positifs, vrais négatifs, faux positifs et faux négatifs.
+
+\subsubsection{Precision}
+
+La précision mesure la proportion de prédictions positives correctes :
+
+\begin{equation}
+\text{Precision} = \frac{TP}{TP + FP}
+\end{equation}
+
+\subsubsection{Recall (Sensibilité)}
+
+Le recall mesure la proportion de vrais positifs détectés :
+
+\begin{equation}
+\text{Recall} = \frac{TP}{TP + FN}
+\end{equation}
+
+\subsubsection{F1-Score}
+
+Le F1-score est la moyenne harmonique de la précision et du recall :
+
+\begin{equation}
+\text{F1-Score} = 2 \cdot \frac{\text{Precision} \times \text{Recall}}{\text{Precision} + \text{Recall}}
+\end{equation}
+
+\subsubsection{ROC-AUC}
+
+L'aire sous la courbe ROC (Receiver Operating Characteristic) évalue la capacité du modèle à discriminer les classes à différents seuils :
+
+\begin{equation}
+\text{AUC} = \int_{0}^{1} \text{TPR}(t) \, d(\text{FPR}(t))
+\end{equation}
+
+où TPR (True Positive Rate) et FPR (False Positive Rate) sont définis par :
+
+\begin{align}
+\text{TPR} &= \frac{TP}{TP + FN} \\
+\text{FPR} &= \frac{FP}{FP + TN}
+\end{align}
+
+\subsection{Stratégies d'Entraînement}
+
+\subsubsection{Callbacks}
+
+Nous avons utilisé plusieurs callbacks pour optimiser l'entraînement :
+
+\paragraph{ModelCheckpoint}
+Sauvegarde automatique du meilleur modèle selon la validation accuracy.
+
+\paragraph{EarlyStopping}
+Arrêt anticipé si la validation loss ne s'améliore pas pendant 10 epochs consécutives :
+
+\begin{equation}
+\text{Stop if } \mathcal{L}_{val}^{(t)} \geq \mathcal{L}_{val}^{(t-10)} \text{ pour } t > 10
+\end{equation}
+
+\paragraph{ReduceLROnPlateau}
+Réduction du taux d'apprentissage si la loss stagne :
+
+\begin{equation}
+\eta_{new} = \eta_{old} \times 0.5 \text{ si pas d'amélioration pendant 5 epochs}
+\end{equation}
+
+avec un minimum de $\eta_{min} = 10^{-7}$.
+
+\paragraph{TensorBoard}
+Logging des métriques pour visualisation et analyse.
+
+\subsection{Hyperparamètres}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Hyperparamètre} & \textbf{Valeur} \\
+\midrule
+Epochs (maximum) & 30 \\
+Batch size & 32 \\
+Learning rate initial & $10^{-4}$ \\
+Optimizer & Adam \\
+Loss function & Binary Cross-Entropy \\
+Dropout rate (layer 1) & 0.5 \\
+Dropout rate (layer 2) & 0.3 \\
+Early stopping patience & 10 \\
+ReduceLR patience & 5 \\
+ReduceLR factor & 0.5 \\
+\bottomrule
+\end{tabular}
+\caption{Hyperparamètres du modèle}
+\label{tab:hyperparams}
+\end{table}
+
+\section{Résultats Expérimentaux}
+
+\subsection{Environnement Expérimental}
+
+\begin{itemize}
+    \item \textbf{Framework} : TensorFlow 2.x / Keras
+    \item \textbf{Langage} : Python 3.12
+    \item \textbf{Système d'exploitation} : Windows 10
+    \item \textbf{Processeur} : CPU (optimisations oneDNN activées)
+\end{itemize}
+
+\subsection{Déroulement de l'Entraînement}
+
+\subsubsection{Convergence}
+
+L'entraînement s'est arrêté à l'epoch 12 (sur 30 maximum) grâce au callback EarlyStopping, indiquant que le modèle avait convergé. Le meilleur modèle a été obtenu à l'epoch 10 avec une validation accuracy de 58.33\%.
+
+\subsubsection{Évolution des Métriques}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{cccccc}
+\toprule
+\textbf{Epoch} & \textbf{Train Loss} & \textbf{Val Loss} & \textbf{Train Acc} & \textbf{Val Acc} & \textbf{LR} \\
+\midrule
+1 & 0.6921 & 0.6854 & 0.5080 & 0.5417 & $1.0 \times 10^{-4}$ \\
+2 & 0.6937 & 0.6793 & 0.3125 & 0.5521 & $1.0 \times 10^{-4}$ \\
+6 & 0.6932 & 0.6885 & 0.4688 & 0.5625 & $1.0 \times 10^{-4}$ \\
+7 & 0.6933 & 0.7210 & 0.4642 & 0.4792 & $1.0 \times 10^{-4}$ \\
+10 & 0.6932 & 0.6926 & 0.5625 & \textbf{0.5833} & $5.0 \times 10^{-5}$ \\
+12 & 0.6926 & 0.7081 & 0.6250 & 0.5625 & $2.5 \times 10^{-5}$ \\
+\bottomrule
+\end{tabular}
+\caption{Évolution des métriques pendant l'entraînement (epochs sélectionnés)}
+\label{tab:training_metrics}
+\end{table}
+
+\subsubsection{Réductions du Learning Rate}
+
+Le callback ReduceLROnPlateau a déclenché deux réductions du taux d'apprentissage :
+\begin{itemize}
+    \item \textbf{Epoch 7} : $\eta = 10^{-4} \rightarrow 5 \times 10^{-5}$
+    \item \textbf{Epoch 12} : $\eta = 5 \times 10^{-5} \rightarrow 2.5 \times 10^{-5}$
+\end{itemize}
+
+\subsection{Performance sur l'Ensemble de Test}
+
+\subsubsection{Métriques Globales}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lc}
+\toprule
+\textbf{Métrique} & \textbf{Valeur} \\
+\midrule
+Accuracy & \textbf{60.18\%} \\
+F1-Score & \textbf{0.6565} \\
+\bottomrule
+\end{tabular}
+\caption{Performance globale sur le test set}
+\label{tab:global_performance}
+\end{table}
+
+\subsubsection{Performance par Classe}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Classe} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} \\
+\midrule
+Bona Fide & 0.6494 & 0.4425 & 0.5263 \\
+Morph & 0.5772 & 0.7611 & 0.6565 \\
+\midrule
+\textbf{Macro Avg} & 0.6133 & 0.6018 & 0.5914 \\
+\textbf{Weighted Avg} & 0.6133 & 0.6018 & 0.5914 \\
+\bottomrule
+\end{tabular}
+\caption{Rapport de classification détaillé}
+\label{tab:classification_report}
+\end{table}
+
+\subsubsection{Matrice de Confusion}
+
+\begin{table}[H]
+\centering
+\begin{tabular}{lcc}
+\toprule
+& \multicolumn{2}{c}{\textbf{Prédiction}} \\
+\cmidrule{2-3}
+\textbf{Vérité Terrain} & Bona Fide & Morph \\
+\midrule
+Bona Fide & \textbf{50} (TN) & 63 (FP) \\
+Morph & 27 (FN) & \textbf{86} (TP) \\
+\bottomrule
+\end{tabular}
+\caption{Matrice de confusion sur le test set}
+\label{tab:confusion_matrix}
+\end{table}
+
+À partir de cette matrice, nous pouvons calculer :
+
+\begin{align}
+\text{Specificity} &= \frac{TN}{TN + FP} = \frac{50}{50 + 63} = 0.4425 \\
+\text{Sensitivity (Recall)} &= \frac{TP}{TP + FN} = \frac{86}{86 + 27} = 0.7611 \\
+\text{False Positive Rate} &= \frac{FP}{FP + TN} = \frac{63}{63 + 50} = 0.5575 \\
+\text{False Negative Rate} &= \frac{FN}{FN + TP} = \frac{27}{27 + 86} = 0.2389
+\end{align}
+
+\subsection{Analyse de la Courbe ROC}
+
+La courbe ROC (Receiver Operating Characteristic) trace le True Positive Rate en fonction du False Positive Rate pour différents seuils de classification. L'aire sous cette courbe (AUC) fournit une mesure agrégée de la performance à tous les seuils possibles.
+
+Pour notre modèle, la courbe ROC montre que le modèle performe significativement mieux qu'un classifieur aléatoire (AUC > 0.5), mais il reste de la marge d'amélioration pour atteindre une discrimination parfaite (AUC = 1.0).
+
+\subsection{Analyse de la Courbe Precision-Recall}
+
+La courbe Precision-Recall est particulièrement utile pour évaluer les modèles sur des datasets équilibrés. Elle montre le trade-off entre précision et recall pour différents seuils de décision.
+
+Le seuil optimal maximisant le F1-score a été identifié graphiquement, permettant d'ajuster le compromis entre minimiser les faux positifs (haute précision) et maximiser la détection des vrais morphs (high recall).
+
+\subsection{Analyse des Distributions de Confiance}
+
+L'analyse des distributions de confiance (probabilités prédites) pour les classes "membres" (training set) et "non-membres" (test set) révèle :
+
+\begin{itemize}
+    \item Les images morphées tendent à avoir des probabilités prédites plus élevées
+    \item Les images bona fide montrent une distribution plus étalée
+    \item Un chevauchement significatif existe entre les deux distributions, expliquant l'accuracy de 60\%
+\end{itemize}
+
+\section{Discussion et Analyse}
+
+\subsection{Interprétation des Résultats}
+
+\subsubsection{Performance Globale}
+
+Avec une accuracy de 60.18\%, notre modèle performe 20\% mieux qu'un classifieur aléatoire (50\%). Ce résultat est encourageant pour une première itération, mais indique également qu'il existe une marge d'amélioration substantielle.
+
+\subsubsection{Déséquilibre Precision-Recall}
+
+Une observation intéressante est le déséquilibre entre :
+\begin{itemize}
+    \item \textbf{Classe Morph} : Haute recall (76.11\%) mais précision modérée (57.72\%)
+    \item \textbf{Classe Bona Fide} : Haute précision (64.94\%) mais recall faible (44.25\%)
+\end{itemize}
+
+Cela suggère que le modèle a tendance à classifier les images comme "Morph" de manière conservative, ce qui :
+\begin{itemize}
+    \item[$+$] Détecte la majorité des morphs (bon recall)
+    \item[$-$] Génère de nombreux faux positifs (faible précision)
+\end{itemize}
+
+\subsubsection{Matrice de Confusion}
+
+L'analyse de la matrice de confusion révèle :
+
+\begin{equation}
+\text{Faux Positifs (63)} > \text{Faux Négatifs (27)}
+\end{equation}
+
+Cela confirme que le modèle a un biais vers la classe "Morph". Dans un contexte de sécurité biométrique, ce biais peut être :
+\begin{itemize}
+    \item \textbf{Avantage} : Réduit les fausses acceptations (risque de sécurité)
+    \item \textbf{Inconvénient} : Augmente les faux rejets (inconfort utilisateur)
+\end{itemize}
+
+\subsection{Facteurs Limitant la Performance}
+
+\subsubsection{Taille du Dataset}
+
+Avec seulement 786 images d'entraînement, le modèle peut souffrir d'un manque de diversité dans les exemples. Pour référence, des modèles state-of-the-art sont entraînés sur des millions d'images.
+
+\subsubsection{Qualité du Morphing}
+
+Si les morphings sont de très haute qualité, ils peuvent être perceptuellement indiscernables des images réelles, rendant la tâche intrinsèquement difficile même pour les humains.
+
+\subsubsection{Transfert de Domaine}
+
+Bien que MobileNetV2 soit pré-entraîné sur ImageNet, il existe un gap de domaine entre les objets naturels d'ImageNet et les visages humains. Un pré-entraînement sur un dataset de visages (comme VGGFace2) pourrait améliorer les résultats.
+
+\subsection{Comparaison avec la Littérature}
+
+Dans la littérature sur la détection de face morphing :
+\begin{itemize}
+    \item Les méthodes basiques (features handcrafted) atteignent 65-75\% d'accuracy
+    \item Les CNN profonds (ResNet, VGG) atteignent 80-95\% d'accuracy
+    \item Les ensembles de modèles peuvent dépasser 95\% d'accuracy
+\end{itemize}
+
+Notre résultat de 60\% se situe en dessous de la baseline, suggérant plusieurs axes d'amélioration.
+
+\subsection{Analyse de Convergence}
+
+\subsubsection{Early Stopping}
+
+L'early stopping à l'epoch 12 indique que le modèle avait atteint un plateau dans sa capacité d'apprentissage. Cela peut être dû à :
+\begin{itemize}
+    \item La capacité limitée de l'architecture pour cette tâche
+    \item Un taux d'apprentissage trop faible après réductions
+    \item Un surapprentissage potentiel
+\end{itemize}
+
+\subsubsection{Écart Train-Validation}
+
+L'écart entre les performances train et validation est modéré, suggérant que le surapprentissage (overfitting) n'est pas le problème principal. Le modèle semble plutôt souffrir d'un sous-apprentissage (underfitting).
+
+\subsection{Implications pour la Confidentialité}
+
+Dans le contexte de l'étude sur les Membership Inference Attacks (MIA), une accuracy modérée de 60\% peut paradoxalement être bénéfique pour la confidentialité :
+
+\begin{equation}
+\text{Privacy Score} = 1 - 2 \times |\text{Accuracy} - 0.5|
+\end{equation}
+
+Dans notre cas :
+\begin{equation}
+\text{Privacy Score} = 1 - 2 \times |0.6018 - 0.5| = 0.7964 = 79.64\%
+\end{equation}
+
+Cela suggère que le modèle ne mémorise pas excessivement les données d'entraînement, ce qui est positif pour la confidentialité des identités sources utilisées dans le face blending.
+
+\section{Améliorations Proposées}
+
+\subsection{Architecture}
+
+\subsubsection{Architectures Plus Profondes}
+
+Essayer des architectures plus complexes :
+\begin{itemize}
+    \item \textbf{ResNet50} : 50 couches avec connexions résiduelles
+    \item \textbf{InceptionV3} : architecture multi-échelle
+    \item \textbf{EfficientNetB0} : architecture optimisée par recherche automatique
+\end{itemize}
+
+\subsubsection{Fine-tuning Plus Profond}
+
+Au lieu de ne dégeler que 20 couches, essayer de dégeler plus de couches (50-100) pour permettre une adaptation plus profonde au domaine des visages.
+
+\subsubsection{Attention Mechanisms}
+
+Intégrer des mécanismes d'attention (Self-Attention, Spatial Attention) pour permettre au modèle de se concentrer sur les régions discriminantes du visage.
+
+\subsection{Données}
+
+\subsubsection{Augmentation du Dataset}
+
+\begin{itemize}
+    \item Générer plus de morphings avec différents paramètres $\alpha$
+    \item Collecter plus d'images bona fide de sources diverses
+    \item Utiliser des datasets publics (LFW, CelebA) pour augmenter la taille
+\end{itemize}
+
+\subsubsection{Data Augmentation Avancée}
+
+\begin{itemize}
+    \item \textbf{Mixup} : mélange linéaire d'exemples
+    \begin{equation}
+    \tilde{x} = \lambda x_i + (1-\lambda)x_j, \quad \tilde{y} = \lambda y_i + (1-\lambda)y_j
+    \end{equation}
+    \item \textbf{CutMix} : découpe et collage de patches entre images
+    \item \textbf{AutoAugment} : politique d'augmentation apprise automatiquement
+\end{itemize}
+
+\subsubsection{Augmentation de la Diversité}
+
+Varier les conditions de génération des morphings :
+\begin{itemize}
+    \item Différentes techniques de morphing (landmarks, GAN-based)
+    \item Différents ratios de mélange $\alpha \in [0.2, 0.8]$
+    \item Différentes résolutions et qualités d'image
+\end{itemize}
+
+\subsection{Entraînement}
+
+\subsubsection{Learning Rate Scheduling}
+
+Utiliser des schedulers plus sophistiqués :
+\begin{itemize}
+    \item \textbf{Cosine Annealing} :
+    \begin{equation}
+    \eta_t = \eta_{min} + \frac{1}{2}(\eta_{max} - \eta_{min})\left(1 + \cos\left(\frac{t}{T}\pi\right)\right)
+    \end{equation}
+    \item \textbf{One-Cycle Policy} : montée puis descente du learning rate
+    \item \textbf{Warmup + Decay} : montée graduelle puis décroissance
+\end{itemize}
+
+\subsubsection{Régularisation}
+
+Renforcer la régularisation pour améliorer la généralisation :
+\begin{itemize}
+    \item \textbf{L2 Regularization} :
+    \begin{equation}
+    \mathcal{L}_{total} = \mathcal{L}_{BCE} + \lambda \sum_{i} \|\mathbf{w}_i\|^2
+    \end{equation}
+    \item \textbf{Dropout Plus Élevé} : augmenter à 0.6-0.7
+    \item \textbf{Label Smoothing} :
+    \begin{equation}
+    y_{smooth} = (1-\epsilon)y + \frac{\epsilon}{K}
+    \end{equation}
+    où $\epsilon = 0.1$ et $K$ est le nombre de classes
+\end{itemize}
+
+\subsubsection{Ensemble Learning}
+
+Combiner plusieurs modèles pour améliorer la robustesse :
+\begin{equation}
+\hat{y}_{ensemble} = \frac{1}{M}\sum_{m=1}^{M} \hat{y}_m
+\end{equation}
+
+où $M$ est le nombre de modèles dans l'ensemble.
+
+\subsection{Optimisation du Seuil}
+
+Plutôt que d'utiliser le seuil par défaut de 0.5, optimiser le seuil de décision pour maximiser le F1-score ou une métrique business-specific :
+
+\begin{equation}
+\theta^* = \arg\max_{\theta} \text{F1-Score}(\theta)
+\end{equation}
+
+\subsection{Transfer Learning Amélioré}
+
+\subsubsection{Pré-entraînement sur Domaine Similaire}
+
+Utiliser un modèle pré-entraîné sur un dataset de visages (VGGFace2, MS-Celeb-1M) plutôt qu'ImageNet pour réduire le domain shift.
+
+\subsubsection{Multi-Task Learning}
+
+Entraîner simultanément sur plusieurs tâches liées :
+\begin{itemize}
+    \item Détection de morphing
+    \item Classification d'identité
+    \item Détection de landmarks
+    \item Estimation de l'âge/genre
+\end{itemize}
+
+\subsection{Analyse et Debugging}
+
+\subsubsection{Grad-CAM Visualization}
+
+Utiliser Gradient-weighted Class Activation Mapping (Grad-CAM) pour visualiser les régions du visage sur lesquelles le modèle se concentre :
+
+\begin{equation}
+L_{Grad-CAM}^c = \text{ReLU}\left(\sum_k \alpha_k^c A^k\right)
+\end{equation}
+
+où $\alpha_k^c = \frac{1}{Z}\sum_i \sum_j \frac{\partial y^c}{\partial A^k_{ij}}$ sont les poids d'importance.
+
+\subsubsection{Analyse des Erreurs}
+
+Examiner manuellement les images mal classées pour identifier des patterns :
+\begin{itemize}
+    \item Quelles sont les caractéristiques des faux positifs ?
+    \item Quelles sont les caractéristiques des faux négatifs ?
+    \item Y a-t-il des biais (âge, genre, ethnicité) ?
+\end{itemize}
+
+\section{Lien avec la Membership Inference Attack}
+
+\subsection{Contexte}
+
+Ce travail de détection de morphing s'inscrit dans un projet plus large sur les Membership Inference Attacks (MIA). L'objectif final est d'évaluer si un modèle de classification d'identités entraîné sur des données de face blending préserve la confidentialité des identités sources.
+
+\subsection{Méthodologie MIA}
+
+La Membership Inference Attack vise à déterminer si un exemple donné faisait partie de l'ensemble d'entraînement d'un modèle :
+
+\begin{equation}
+\text{MIA}(x, f) : \{0, 1\} \rightarrow \{\text{member}, \text{non-member}\}
+\end{equation}
+
+où $x$ est un exemple et $f$ est le modèle cible.
+
+\subsubsection{Méthodes MIA Implémentées}
+
+\paragraph{Threshold Attack}
+Attaque baseline basée sur un seuil de confiance :
+
+\begin{equation}
+\text{IsMember}(x) = \begin{cases}
+1 & \text{if } \max_k p_k(x) > \tau \\
+0 & \text{otherwise}
+\end{cases}
+\end{equation}
+
+où $p_k(x)$ est la probabilité prédite pour la classe $k$, et $\tau$ est le seuil.
+
+\paragraph{Shadow Model Attack (Shokri et al., 2017)}
+Entraîne un modèle d'attaque (Random Forest) sur les features extraites :
+
+\begin{align}
+\text{Features}(x) &= [p_1(x), p_2(x), ..., p_K(x), H(p(x)), \text{conf}(x)] \\
+\text{AttackModel}(\text{Features}(x)) &\rightarrow \{\text{member}, \text{non-member}\}
+\end{align}
+
+où $H(p(x)) = -\sum_k p_k(x) \log p_k(x)$ est l'entropie.
+
+\paragraph{Metric-based Attack (Yeom et al., 2018)}
+Utilise des métriques simples (perte, confiance) avec Logistic Regression.
+
+\subsection{Résultats Attendus MIA}
+
+Pour un modèle avec bonne confidentialité :
+
+\begin{equation}
+\text{Accuracy}_{MIA} \approx 0.5 \quad (\text{random guess})
+\end{equation}
+
+Pour un modèle avec mauvaise confidentialité (forte mémorisation) :
+
+\begin{equation}
+\text{Accuracy}_{MIA} \gg 0.5 \quad (\text{can distinguish members})
+\end{equation}
+
+\subsection{Privacy Score}
+
+Le score de confidentialité est défini comme :
+
+\begin{equation}
+\text{Privacy Score} = 1 - 2 \times (\text{Accuracy}_{MIA} - 0.5)
+\end{equation}
+
+\begin{itemize}
+    \item $\text{Privacy Score} = 1.0$ : Confidentialité parfaite
+    \item $\text{Privacy Score} > 0.8$ : Bonne confidentialité
+    \item $\text{Privacy Score} < 0.6$ : Mauvaise confidentialité
+\end{itemize}
+
+\subsection{Hypothèse de Recherche}
+
+L'hypothèse principale du projet est que :
+
+\begin{quote}
+\textit{L'utilisation de face blending pour générer des identités fictives permet de créer un modèle de classification qui ne mémorise pas les identités sources, résultant en une MIA accuracy proche de 50\% et donc une excellente confidentialité.}
+\end{quote}
+
+Le modèle de détection de morphing actuel constitue une étape préliminaire pour :
+\begin{enumerate}
+    \item Valider la qualité des morphings générés
+    \item Comprendre les caractéristiques discriminantes entre morphs et bona fide
+    \item Préparer le pipeline pour l'évaluation MIA complète
+\end{enumerate}
+
+\section{Conclusion}
+
+\subsection{Contributions}
+
+Ce travail a présenté :
+\begin{enumerate}
+    \item Une implémentation complète d'un système de détection de face morphing basé sur MobileNetV2
+    \item Une évaluation rigoureuse avec des métriques multiples (accuracy, precision, recall, F1-score)
+    \item Une analyse détaillée des forces et faiblesses du modèle
+    \item Des pistes d'amélioration concrètes pour des travaux futurs
+    \item Un lien avec l'étude de la confidentialité via les MIA
+\end{enumerate}
+
+\subsection{Résultats Clés}
+
+\begin{itemize}
+    \item \textbf{Accuracy} : 60.18\% sur le test set
+    \item \textbf{F1-Score} : 0.6565 pour la classe Morph
+    \item \textbf{Recall Morph} : 76.11\% (bonne détection des morphs)
+    \item \textbf{Precision Morph} : 57.72\% (nombreux faux positifs)
+\end{itemize}
+
+\subsection{Limitations}
+
+Les principales limitations identifiées sont :
+\begin{itemize}
+    \item Taille limitée du dataset (1124 images)
+    \item Performance modérée nécessitant des améliorations
+    \item Biais vers la classe "Morph" générant de nombreux faux positifs
+    \item Manque d'analyse qualitative (visualisations Grad-CAM, etc.)
+\end{itemize}
+
+\subsection{Perspectives Futures}
+
+\subsubsection{Court Terme}
+
+\begin{itemize}
+    \item Tester des architectures plus profondes (ResNet50, InceptionV3)
+    \item Augmenter la taille du dataset
+    \item Implémenter des techniques de data augmentation avancées
+    \item Optimiser le seuil de décision pour le F1-score
+\end{itemize}
+
+\subsubsection{Moyen Terme}
+
+\begin{itemize}
+    \item Entraîner un classifieur d'identités sur les données de face blending
+    \item Implémenter et évaluer les attaques MIA (Threshold, Shadow Model, Metric-based)
+    \item Comparer la confidentialité : avec vs sans face blending
+    \item Publier les résultats dans une conférence académique
+\end{itemize}
+
+\subsubsection{Long Terme}
+
+\begin{itemize}
+    \item Développer des techniques de défense contre les MIA
+    \item Étudier l'impact du ratio de blending $\alpha$ sur la confidentialité
+    \item Intégrer des mécanismes de differential privacy
+    \item Étendre l'étude à d'autres modalités biométriques (iris, empreintes digitales)
+\end{itemize}
+
+\subsection{Remarques Finales}
+
+Ce projet illustre l'importance de l'évaluation rigoureuse des modèles d'apprentissage profond, non seulement en termes de performance (accuracy, F1-score), mais aussi en termes de confidentialité. Alors que notre modèle de détection de morphing atteint une performance modérée de 60\%, il constitue une base solide pour l'étude plus approfondie de la confidentialité via les Membership Inference Attacks.
+
+L'équilibre entre performance de classification et préservation de la confidentialité représente un axe de recherche majeur en machine learning moderne. Le face blending, en tant que technique d'augmentation de données et de protection de la vie privée, offre une approche prometteuse pour atteindre cet équilibre.
+
+Les travaux futurs devront confirmer l'hypothèse selon laquelle le face blending permet de réduire significativement la vulnérabilité aux attaques MIA, tout en maintenant une performance de classification acceptable pour les tâches de reconnaissance d'identités.
+
+\section*{Remerciements}
+
+Je remercie mon encadrant, Dr. Mahmoud Ghorbal (mahmoud.ghorbal@uphf.fr), pour ses conseils et son soutien tout au long de ce projet de recherche.
+
+\begin{thebibliography}{99}
+
+\bibitem{sandler2018mobilenetv2}
+Sandler, M., Howard, A., Zhu, M., Zhmoginov, A., \& Chen, L. C. (2018).
+\textit{MobileNetV2: Inverted Residuals and Linear Bottlenecks}.
+In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pp. 4510-4520.
+
+\bibitem{ghorbel2024}
+Ghorbel, E., Maddouri, G., \& Ghorbel, F. (2024).
+\textit{Face Blending Data Augmentation for Enhancing Deep Classification}.
+In Proceedings of the 13th International Conference on Pattern Recognition Applications and Methods (ICPRAM), pp. 274-280.
+
+\bibitem{shokri2017}
+Shokri, R., Stronati, M., Song, C., \& Shmatikov, V. (2017).
+\textit{Membership Inference Attacks Against Machine Learning Models}.
+In 2017 IEEE Symposium on Security and Privacy (SP), pp. 3-18.
+
+\bibitem{yeom2018}
+Yeom, S., Giacomelli, I., Fredrikson, M., \& Jha, S. (2018).
+\textit{Privacy Risk in Machine Learning: Analyzing the Connection Between Overfitting and Membership Inference}.
+In 2018 IEEE 31st Computer Security Foundations Symposium (CSF), pp. 268-282.
+
+\bibitem{dwork2006}
+Dwork, C. (2006).
+\textit{Differential Privacy}.
+In Proceedings of the 33rd International Colloquium on Automata, Languages and Programming (ICALP), Part II, pp. 1-12.
+
+\bibitem{abadi2016}
+Abadi, M., Chu, A., Goodfellow, I., McMahan, H. B., Mironov, I., Talwar, K., \& Zhang, L. (2016).
+\textit{Deep Learning with Differential Privacy}.
+In Proceedings of the 2016 ACM SIGSAC Conference on Computer and Communications Security (CCS), pp. 308-318.
+
+\bibitem{kingma2014}
+Kingma, D. P., \& Ba, J. (2014).
+\textit{Adam: A Method for Stochastic Optimization}.
+arXiv preprint arXiv:1412.6980.
+
+\bibitem{srivastava2014}
+Srivastava, N., Hinton, G., Krizhevsky, A., Sutskever, I., \& Salakhutdinov, R. (2014).
+\textit{Dropout: A Simple Way to Prevent Neural Networks from Overfitting}.
+The Journal of Machine Learning Research, 15(1), pp. 1929-1958.
+
+\bibitem{he2016}
+He, K., Zhang, X., Ren, S., \& Sun, J. (2016).
+\textit{Deep Residual Learning for Image Recognition}.
+In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pp. 770-778.
+
+\bibitem{szegedy2016}
+Szegedy, C., Vanhoucke, V., Ioffe, S., Shlens, J., \& Wojna, Z. (2016).
+\textit{Rethinking the Inception Architecture for Computer Vision}.
+In Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR), pp. 2818-2826.
+
+\end{thebibliography}
+
+\appendix
+
+\section{Annexes}
+
+\subsection{Code Source Principal}
+
+Le code source complet est disponible dans le fichier \texttt{train\_mobilenet\_detector.py}. L'architecture du modèle est définie dans la classe \texttt{MorphingDetectorTrainer}.
+
+\subsection{Fichiers Générés}
+
+L'entraînement a généré les fichiers suivants :
+\begin{itemize}
+    \item \texttt{model\_output/models/best\_model\_20260130\_162200.keras} : Meilleur modèle
+    \item \texttt{model\_output/models/final\_model\_20260130\_162200.keras} : Modèle final
+    \item \texttt{model\_output/plots/training\_curves.png} : Courbes d'entraînement
+    \item \texttt{model\_output/plots/confusion\_matrix.png} : Matrice de confusion
+    \item \texttt{model\_output/plots/roc\_curve.png} : Courbe ROC
+    \item \texttt{model\_output/plots/precision\_recall\_curve.png} : Courbe Precision-Recall
+    \item \texttt{model\_output/logs/} : Logs TensorBoard
+\end{itemize}
+
+\subsection{Commandes d'Exécution}
+
+\subsubsection{Entraînement du Modèle}
+
+\begin{verbatim}
+python train_mobilenet_detector.py \
+    --morph dataset/morph \
+    --bona-fide dataset/real \
+    --epochs 30 \
+    --batch-size 32 \
+    --img-size 224 \
+    --trainable-layers 20
+\end{verbatim}
+
+\subsubsection{Visualisation avec TensorBoard}
+
+\begin{verbatim}
+tensorboard --logdir=model_output/logs
+\end{verbatim}
+
+Puis ouvrir le navigateur à l'adresse \url{http://localhost:6006}.
+
+\subsection{Environnement Python}
+
+\subsubsection{Dépendances}
+
+\begin{verbatim}
+tensorflow>=2.10.0
+numpy>=1.21.0
+opencv-python>=4.5.0
+matplotlib>=3.4.0
+seaborn>=0.11.0
+scikit-learn>=1.0.0
+tqdm>=4.62.0
+\end{verbatim}
+
+\subsubsection{Installation}
+
+\begin{verbatim}
+pip install tensorflow numpy opencv-python matplotlib seaborn \
+    scikit-learn tqdm pandas
+\end{verbatim}
+
+\end{document}

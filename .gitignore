@@ -1,16 +1,4 @@
-# Fichiers de morphing générés
-morphing_results/
-*.png
-*.jpg
-*.jpeg
-*.gif
-
-# Modèles Dlib (trop volumineux pour GitHub)
-dlib_models/
-*.dat
-*.bz2
-
-# Fichiers Python
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
@@ -18,19 +6,49 @@ __pycache__/
 .Python
 env/
 venv/
-ENV/
+*.egg-info/
+dist/
+build/
 
 # Jupyter Notebook
-.ipynb_checkpoints/
-*.ipynb_checkpoints
+.ipynb_checkpoints
+*.ipynb
 
-# Fichiers système
+# LaTeX temporary files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# Large files
+*.pdf
+*.zip
+*.tar.gz
+*.rar
+
+# Model outputs (can be regenerated)
+model_output/
+morphing_results/
+morphed_dataset/
+statistics_output/
+statistics_output_optimized/
+demo_statistics_output/
+
+# Data directories (large)
+ffhq_data/
+dlib_models/*.dat
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# Données scikit-learn
-scikit_learn_data/
-"dataset/*.png" 
-"dataset/*.jpg" 
-"dataset/*.jpeg" 
