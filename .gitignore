@@ -1,0 +1,33 @@
+# Fichiers de morphing générés
+morphing_results/
+*.png
+*.jpg
+*.jpeg
+*.gif
+
+# Modèles Dlib (trop volumineux pour GitHub)
+dlib_models/
+*.dat
+*.bz2
+
+# Fichiers Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Données scikit-learn
+scikit_learn_data/
