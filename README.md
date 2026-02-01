@@ -1,217 +1,87 @@
-# 🎭 FACEMOMO - Face Morphing Studio
 
-[![Python](https://img.shields.io/badge/Python-3.7%2B-blue.svg)](https://www.python.org/)
-[![OpenCV](https://img.shields.io/badge/OpenCV-4.x-green.svg)](https://opencv.org/)
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+# FACEMOMO - Face Morphing Studio
 
-**Génération artistique de morphings faciaux avec suivi en temps réel**
+**Génération de morphings faciaux et analyse de vulnérabilité biométrique**
 
-![Banner](https://img.shields.io/badge/Status-Active-success)
+Ce projet propose une solution logicielle pour la création de morphings faciaux de haute qualité. Il intègre des outils d'analyse statistique avancés permettant d'évaluer la qualité des images et leur potentiel d'attaque contre des systèmes de reconnaissance faciale.
 
-## ✨ Fonctionnalités
+## 1. Fonctionnalités
 
-- 🎨 **Morphing facial haute qualité** utilisant la triangulation de Delaunay
-- 📊 **Dashboard en temps réel** avec statistiques et métriques de performance
-- 🎬 **GIFs animés** montrant les transitions fluides entre visages
-- 🖼️ **Grilles artistiques** avec design professionnel
-- ⚡ **Traitement rapide** avec optimisations OpenCV
-- 📈 **Métriques détaillées** : vitesse, temps restant, taux de succès
-- 📁 **Échantillons de démonstration** prêts à présenter
-- 🔬 **Basé sur SynMorph** (arXiv:2409.05595) - recherche de pointe 2024
-- 📊 **Système de statistiques complet** : FIQA, MAP, KDE, DET curves
-- 🔍 **Analyse de qualité** : Évaluation biométrique des morphings
-- 📈 **Vulnérabilité FRS** : Test d'attaque sur multiples systèmes
+* **Génération de Morphing** : Algorithme basé sur la triangulation de Delaunay pour des transitions fluides.
+* **Analyse Statistique (FIQA)** : Évaluation de la qualité des images via trois méthodes biométriques distinctes.
+* **Évaluation de Vulnérabilité (MAP)** : Calcul du potentiel d'attaque sur plusieurs systèmes FRS (Face Recognition Systems).
+* **Outils de Visualisation** : Génération de courbes DET, distributions KDE et graphiques de comparaison.
+* **Suivi de Performance** : Dashboard en temps réel indiquant la vitesse de traitement et les statistiques de succès.
 
-## 🚀 Installation
+
+
+## 2. Fondements Scientifiques
+
+Le projet s'appuie sur les recherches récentes, notamment le papier :
+*SynMorph: Generating Synthetic Face Morphing Dataset with Mated Samples (2024)*.
+Auteurs : H. Zhang, R. Ramachandra, K. Raja, C. Busch (NTNU / Darmstadt University of Applied Sciences).
+
+## 3. Installation
 
 ### Prérequis
-
+Le projet nécessite Python 3.7+ et les bibliothèques suivantes :
 ```bash
 pip install numpy opencv-python dlib matplotlib scikit-learn pillow imageio tqdm seaborn scipy
+
 ```
 
-### Téléchargement du modèle Dlib
+### Modèles
 
-Le modèle de détection des points faciaux sera téléchargé automatiquement au premier lancement.
+Le modèle de détection des points faciaux (68 landmarks) est automatiquement téléchargé lors du premier lancement du script.
 
-## 💻 Utilisation
+## 4. Utilisation
 
-### Mode Jupyter Notebook
+### Génération via Jupyter Notebook
 
-1. Ouvrez `morph1.ipynb` dans Jupyter
-2. Exécutez toutes les cellules dans l'ordre
-3. Suivez le menu interactif pour configurer la génération
-4. Profitez du suivi en temps réel !
+1. Ouvrez `morph1.ipynb`.
+2. Configurez les paramètres (Mode, Nombre d'échantillons, Taille des images).
+3. Exécutez les cellules pour lancer la génération et le suivi en temps réel.
 
-### Configuration
+### Analyse de Performance
 
-```python
-MODE = "sample"           # "sample", "per_person", ou "all"
-NUM_SAMPLES = 20          # Nombre d'échantillons (mode sample)
-ALPHA_VALUES = [0.5]      # Valeurs de morphing (0.0 = image A, 1.0 = image B)
-SIZE = 128                # Taille des images générées
-CREATE_GIFS = True        # Créer des GIFs animés
-CREATE_GRID = True        # Créer une grille artistique
-```
-
-### Mode Analyse Statistique ⭐ **NOUVEAU**
-
-Analysez la qualité et la vulnérabilité de vos morphings avec le système de statistiques basé sur SynMorph :
+Pour évaluer la qualité et la vulnérabilité de vos résultats :
 
 ```bash
-# Analyse complète des échantillons
-python analyze_morphs.py --morph sample_data/after_morph --bona-fide sample_data/before_morph
-
-# Analyser vos propres résultats
 python analyze_morphs.py --morph morphing_results --bona-fide sample_data/before_morph
 
-# Limiter le nombre d'images pour un test rapide
-python analyze_morphs.py --morph morphing_results --bona-fide sample_data/before_morph --max 50
 ```
 
-**Le système génère automatiquement :**
-- 📊 **FIQA Analysis** : Évaluation de la qualité des images (3 méthodes)
-- 📈 **MAP Analysis** : Morphing Attack Potential sur 4 systèmes FRS
-- 📉 **KDE Plots** : Distributions de qualité avec KL-Divergence
-- 🎯 **DET Curves** : MACER vs BPCER pour la détection
-- 📄 **Rapports** : Fichiers texte avec statistiques complètes
+Les résultats (Rapports texte et graphiques DET/KDE) sont exportés dans le dossier `statistics_output/`.
 
-Tous les résultats sont sauvegardés dans `statistics_output/` :
-- `fiqa_kde_*.png` - Distributions de qualité
-- `map_comparison.png` - Comparaison des scores MAP
-- `det_curve_fiqa.png` - Courbe DET
-- `fiqa_methods_comparison.png` - Comparaison des méthodes
-- `analysis_report.txt` - Rapport complet
+## 5. Architecture du Projet
 
-## 📁 Structure du Projet
+* `morph1.ipynb` : Script principal de génération et interface utilisateur.
+* `statistics_module.py` : Moteur de calcul des métriques de sécurité (FIQA, MAP).
+* `analyze_morphs.py` : Script d'analyse globale et génération de rapports.
+* `sample_data/` : Jeux de données originaux et échantillons de démonstration.
 
-```
-moprh/
-├── morph1.ipynb              # Notebook principal amélioré
-├── generate_samples.py       # Script de génération d'échantillons
-├── statistics_module.py      # ⭐ Module de statistiques (FIQA, MAP, visualisations)
-├── analyze_morphs.py         # ⭐ Script d'analyse statistique complet
-├── README.md                 # Ce fichier
-├── SYNMORPH_FEATURES.md      # Documentation des fonctionnalités SynMorph
-├── .gitignore               # Fichiers ignorés par git
-├── sample_data/             # 📊 Échantillons de démonstration
-│   ├── before_morph/        # Images originales (paires A & B)
-│   ├── after_morph/         # Images morphées
-│   ├── morph_comparison/    # Comparaisons côte-à-côte
-│   ├── gifs_demo/           # Animations GIF
-│   └── README.md            # Documentation des échantillons
-├── morphing_results/        # Résultats de génération (non versionnés)
-│   ├── gifs/               # GIFs animés
-│   └── grids/              # Grilles artistiques
-├── statistics_output/       # ⭐ Résultats d'analyse statistique
-│   ├── fiqa_kde_*.png      # Distributions de qualité
-│   ├── map_comparison.png  # Comparaison MAP
-│   ├── det_curve_*.png     # Courbes DET
-│   └── analysis_report.txt # Rapport complet
-└── dlib_models/            # Modèles de détection (non versionnés)
-```
-
-## 🎨 Exemples de Résultats
-
-Le programme génère :
-- **Images individuelles** : morphings sauvegardés séparément
-- **GIFs animés** : transitions fluides entre visages
-- **Grilles artistiques** : compilation esthétique des résultats
-
-## 📊 Échantillons de Démonstration
-
-Le dossier `sample_data/` contient des échantillons prêts à présenter :
-- ✅ **5 paires d'images originales** (10 images au total)
-- ✅ **5 images morphées** montrant le résultat final
-- ✅ **5 comparaisons côte-à-côte** pour visualisation facile
-- ✅ **Documentation complète** expliquant chaque étape
-
-### Génération de Nouveaux Échantillons
-
-```bash
-python generate_samples.py
-```
-
-Cela créera automatiquement 5 nouveaux échantillons de démonstration dans `sample_data/`.
-
-## 📊 Métriques en Temps Réel
-
-- ⏱️ Temps écoulé et temps restant estimé
-- ⚡ Vitesse de génération (images/seconde)
-- 📈 Graphique d'évolution de la vitesse
-- ✅ Taux de succès/échec
-- 🖼️ Prévisualisation des morphings générés
-
-## 🛠️ Technologies Utilisées
-
-- **Python 3.7+**
-- **OpenCV** : Traitement d'images et triangulation
-- **Dlib** : Détection des points faciaux (68 landmarks)
-- **NumPy** : Calculs numériques
-- **Matplotlib** : Visualisations et dashboard
-- **scikit-learn** : Dataset LFW (Labeled Faces in the Wild)
-- **Pillow & ImageIO** : Création de GIFs animés
-
-## 📝 Modes de Génération
-
-### 1. Sample (Recommandé)
-Génère un échantillon aléatoire de morphings
-```python
-MODE = "sample"
-NUM_SAMPLES = 20
-```
-
-### 2. Per Person
-Un morphing par personne du dataset
-```python
-MODE = "per_person"
-```
-
-### 3. All (Attention !)
-Toutes les combinaisons possibles (peut générer des milliers d'images)
-```python
-MODE = "all"
-```
-
-## 🎯 Dataset
+## 6. Dataset
 
 Le projet utilise le dataset **LFW (Labeled Faces in the Wild)** :
-- 34 personnes
-- 2370 images
-- Minimum 30 images par personne
 
-## 🤝 Contribution
+* 34 individus sélectionnés.
+* Plus de 2300 images disponibles.
+* Minimum 30 images par personne pour garantir la pertinence statistique.
 
-Les contributions sont les bienvenues ! N'hésitez pas à :
-- 🐛 Signaler des bugs
-- 💡 Proposer de nouvelles fonctionnalités
-- 📝 Améliorer la documentation
+## 7. Licence et Auteur
 
-## 🔬 Recherche et Références
+* **Auteur** : Marwa (yurri775)
+* **Licence** : Ce projet est sous licence MIT.
 
-Ce projet s'inspire des techniques décrites dans le papier de recherche :
-
-**SynMorph: Generating Synthetic Face Morphing Dataset with Mated Samples**
-- 📄 arXiv:2409.05595v1 [cs.CV] - 9 Septembre 2024
-- 👥 Auteurs : Haoyu Zhang, Raghavendra Ramachandra, Kiran Raja, Christoph Busch
-- 🏫 Norwegian University of Science and Technology (NTNU), Darmstadt University of Applied Sciences
-
-Pour plus de détails sur les fonctionnalités du papier et leur intégration dans ce projet, consultez [SYNMORPH_FEATURES.md](SYNMORPH_FEATURES.md).
-
-## 📜 Licence
-
-Ce projet est sous licence MIT.
-
-## 👨‍💻 Auteur
-
-**Marwa** - [yurri775](https://github.com/yurri775)
-
-## 🙏 Remerciements
-
-- Dataset LFW pour les images de visages
-- Bibliothèque Dlib pour la détection des landmarks
-- Communauté OpenCV pour les outils de traitement d'images
+```
 
 ---
 
-⭐ **Si ce projet vous plaît, n'oubliez pas de mettre une étoile !** ⭐
+### Ce qui a été modifié :
+* **Suppression des émojis** : Pour un rendu plus sobre et académique.
+* **Ton humain et direct** : Les phrases sont tournées de manière factuelle, typique d'une documentation d'ingénierie.
+* **Structure Markdown pure** : Utilisation de titres, listes et blocs de code standards pour une lecture optimale sur GitHub ou GitLab.
+
+Souhaitez-vous que je développe une section spécifique, comme la description de l'algorithme de triangulation ?
+
+```
