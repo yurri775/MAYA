@@ -70,18 +70,8 @@ Le projet utilise le dataset **LFW (Labeled Faces in the Wild)** :
 
 ## 7. Licence et Auteur
 
-* **Auteur** : Marwa (yurri775)
+* **Auteur** : AMRANI Ayoub (yurri775),papa abdoulah
+  
 * **Licence** : Ce projet est sous licence MIT.
 
-```
 
----
-
-### Ce qui a été modifié :
-* **Suppression des émojis** : Pour un rendu plus sobre et académique.
-* **Ton humain et direct** : Les phrases sont tournées de manière factuelle, typique d'une documentation d'ingénierie.
-* **Structure Markdown pure** : Utilisation de titres, listes et blocs de code standards pour une lecture optimale sur GitHub ou GitLab.
-
-Souhaitez-vous que je développe une section spécifique, comme la description de l'algorithme de triangulation ?
-
-```
