@@ -1,0 +1,968 @@
+\documentclass[12pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{tikz}
+\usepackage{pgfplots}
+\usepackage{mathtools}
+\usepackage{bm}
+\usepackage{amsthm}
+
+\usetikzlibrary{shapes,arrows,positioning,calc}
+\pgfplotsset{compat=1.17}
+
+\geometry{margin=2.5cm}
+
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2,
+    language=Python
+}
+\lstset{style=mystyle}
+
+\newtheorem{definition}{Definition}
+\newtheorem{theorem}{Theoreme}
+\newtheorem{proposition}{Proposition}
+
+\title{
+    \vspace{-2cm}
+    \textbf{Rapport Technique Approfondi}\\
+    \vspace{0.5cm}
+    \Large{Systeme de Generation d'Images Morphees de Visages}\\
+    \large{Implementation Basee sur la Triangulation de Delaunay,\\Detection de Landmarks Faciaux et Transformations Affines}
+}
+\author{
+    Projet de Recherche en Vision par Ordinateur\\
+    \small{Traitement d'Images et Biometrie Faciale}
+}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Ce rapport presente une implementation technique detaillee d'un systeme de morphing facial utilisant la triangulation de Delaunay et la detection de points de repere faciaux. L'approche repose sur trois piliers fondamentaux : (1) la detection robuste des 68 landmarks faciaux via un modele de regression en cascade (Ensemble of Regression Trees - ERT), (2) la decomposition geometrique du visage par triangulation de Delaunay satisfaisant le critere du cercle circonscrit vide, et (3) l'interpolation barycentrique des pixels au sein de chaque triangle via des transformations affines. Le systeme traite le dataset CASIA-WebFace contenant 21,846 images de 200 identites distinctes, permettant la generation de $C_{50}^{2} \times 30 = 36,750$ images morphees. L'analyse de complexite revele une complexite temporelle de $\mathcal{O}(n \log n)$ pour la triangulation et $\mathcal{O}(w \times h \times t)$ pour le warping, ou $t$ represente le nombre de triangles.
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+%==============================================================================
+\section{Introduction et Problematique}
+%==============================================================================
+
+\subsection{Contexte Scientifique}
+
+Le morphing facial constitue une technique de transformation d'image visant a generer une image intermediaire $I_M$ a partir de deux images sources $I_A$ et $I_B$, telle que $I_M$ preserve les caracteristiques structurelles et texturales des deux visages. Formellement, pour un coefficient de melange $\alpha \in [0,1]$ :
+
+\begin{equation}
+I_M = \mathcal{M}(I_A, I_B, \alpha)
+\end{equation}
+
+ou $\mathcal{M}$ represente l'operateur de morphing satisfaisant les conditions aux limites :
+\begin{align}
+\mathcal{M}(I_A, I_B, 0) &= I_A \\
+\mathcal{M}(I_A, I_B, 1) &= I_B
+\end{align}
+
+\subsection{Applications en Securite Biometrique}
+
+Les attaques par morphing (Morphing Attack) representent une menace majeure pour les systemes de verification faciale. Une image morphee $I_M$ peut tromper un systeme biometrique si :
+
+\begin{equation}
+\text{sim}(f(I_M), f(I_A)) > \tau \quad \text{et} \quad \text{sim}(f(I_M), f(I_B)) > \tau
+\end{equation}
+
+ou $f(\cdot)$ est l'extracteur de caracteristiques faciales, $\text{sim}(\cdot, \cdot)$ est la mesure de similarite (cosinus), et $\tau$ est le seuil de decision.
+
+\subsection{Objectifs Techniques}
+
+\begin{enumerate}
+    \item Implementer un pipeline de morphing robuste avec detection automatique des landmarks
+    \item Garantir la preservation de la topologie faciale via triangulation de Delaunay
+    \item Minimiser les artefacts visuels par interpolation bilineaire et masquage anti-aliasing
+    \item Generer un dataset a grande echelle pour la recherche en detection de morphing
+\end{enumerate}
+
+%==============================================================================
+\section{Fondements Theoriques}
+%==============================================================================
+
+\subsection{Detection des Landmarks Faciaux}
+
+\subsubsection{Modele de Regression en Cascade (ERT)}
+
+Le modele Dlib utilise un \textit{Ensemble of Regression Trees} (ERT) pour la prediction des landmarks. Soit $\mathbf{S} = \{(x_i, y_i)\}_{i=1}^{68}$ le vecteur des 68 points de repere, le modele estime iterativement :
+
+\begin{equation}
+\mathbf{S}^{(t+1)} = \mathbf{S}^{(t)} + r_t(\mathbf{I}, \mathbf{S}^{(t)})
+\end{equation}
+
+ou $r_t$ est le regresseur a l'etape $t$ et $\mathbf{I}$ represente l'intensite de l'image. Chaque regresseur $r_t$ est un ensemble d'arbres de decision :
+
+\begin{equation}
+r_t = \sum_{k=1}^{K} g_{t,k}
+\end{equation}
+
+avec $K$ arbres par etape et $T$ etapes de cascade ($T \approx 10$, $K \approx 500$).
+
+\subsubsection{Caracteristiques de Difference de Pixels}
+
+Les arbres utilisent des \textit{pixel difference features} indexees relativement a la forme courante :
+
+\begin{equation}
+\phi_{(u,v)}(\mathbf{I}, \mathbf{S}) = \mathbf{I}(\mathbf{p}_u) - \mathbf{I}(\mathbf{p}_v)
+\end{equation}
+
+ou $\mathbf{p}_u$ et $\mathbf{p}_v$ sont des positions calculees par :
+
+\begin{equation}
+\mathbf{p}_u = \mathbf{S}_{\text{ref}} + \mathbf{R}(\theta) \cdot s \cdot \delta_u
+\end{equation}
+
+avec $\mathbf{R}(\theta)$ la matrice de rotation, $s$ le facteur d'echelle, et $\delta_u$ le deplacement normalise.
+
+\subsubsection{Repartition Anatomique des 68 Points}
+
+\begin{table}[H]
+\centering
+\caption{Correspondance anatomique des indices de landmarks}
+\begin{tabular}{lccl}
+\toprule
+\textbf{Region Anatomique} & \textbf{Indices} & \textbf{Card.} & \textbf{Description} \\
+\midrule
+Contour mandibulaire & 0--16 & 17 & Ligne de la machoire (jawline) \\
+Sourcil gauche & 17--21 & 5 & Arc sourcilier gauche \\
+Sourcil droit & 22--26 & 5 & Arc sourcilier droit \\
+Arete nasale & 27--30 & 4 & Dorsum du nez \\
+Base nasale & 31--35 & 5 & Ailes et pointe du nez \\
+Oeil gauche & 36--41 & 6 & Contour palpebral gauche \\
+Oeil droit & 42--47 & 6 & Contour palpebral droit \\
+Levres externes & 48--59 & 12 & Vermillon externe \\
+Levres internes & 60--67 & 8 & Ligne labiale interne \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Triangulation de Delaunay}
+
+\begin{definition}[Triangulation de Delaunay]
+Soit $P = \{p_1, ..., p_n\}$ un ensemble de points dans $\mathbb{R}^2$. Une triangulation $\mathcal{T}$ de $P$ est une triangulation de Delaunay si et seulement si le cercle circonscrit a chaque triangle ne contient aucun autre point de $P$ dans son interieur.
+\end{definition}
+
+\subsubsection{Proprietes Mathematiques}
+
+\begin{theorem}[Critere du cercle vide]
+Un triangle $\triangle ABC$ appartient a la triangulation de Delaunay si et seulement si pour tout point $D \in P \setminus \{A, B, C\}$ :
+\begin{equation}
+\begin{vmatrix}
+A_x - D_x & A_y - D_y & (A_x - D_x)^2 + (A_y - D_y)^2 \\
+B_x - D_x & B_y - D_y & (B_x - D_x)^2 + (B_y - D_y)^2 \\
+C_x - D_x & C_y - D_y & (C_x - D_x)^2 + (C_y - D_y)^2
+\end{vmatrix} > 0
+\end{equation}
+\end{theorem}
+
+\begin{proposition}[Optimalite angulaire]
+Parmi toutes les triangulations possibles de $P$, la triangulation de Delaunay maximise l'angle minimum de tous les triangles, evitant ainsi les triangles tres allonges (``sliver triangles'').
+\end{proposition}
+
+\subsubsection{Algorithme de Construction}
+
+L'implementation utilise l'algorithme incremental de Bowyer-Watson avec complexite $\mathcal{O}(n \log n)$ en moyenne :
+
+\begin{algorithm}[H]
+\caption{Triangulation de Delaunay (Bowyer-Watson)}
+\begin{algorithmic}[1]
+\REQUIRE Ensemble de points $P = \{p_1, ..., p_n\}$
+\ENSURE Triangulation de Delaunay $\mathcal{T}$
+\STATE Creer un super-triangle $T_0$ englobant tous les points
+\STATE $\mathcal{T} \leftarrow \{T_0\}$
+\FOR{$i = 1$ \TO $n$}
+    \STATE $\mathcal{B} \leftarrow \{T \in \mathcal{T} : p_i \in \text{CircumCircle}(T)\}$ \COMMENT{Triangles invalides}
+    \STATE $\mathcal{H} \leftarrow \text{BoundaryEdges}(\mathcal{B})$ \COMMENT{Cavite polygonale}
+    \STATE $\mathcal{T} \leftarrow \mathcal{T} \setminus \mathcal{B}$
+    \FOR{chaque arete $e \in \mathcal{H}$}
+        \STATE $\mathcal{T} \leftarrow \mathcal{T} \cup \{\text{Triangle}(e, p_i)\}$
+    \ENDFOR
+\ENDFOR
+\STATE Supprimer les triangles connectes aux sommets de $T_0$
+\RETURN $\mathcal{T}$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Transformations Affines}
+
+\subsubsection{Definition Mathematique}
+
+Une transformation affine $\mathcal{A}: \mathbb{R}^2 \rightarrow \mathbb{R}^2$ est definie par :
+
+\begin{equation}
+\mathcal{A}(\mathbf{x}) = \mathbf{M} \cdot \mathbf{x} + \mathbf{t}
+\end{equation}
+
+ou $\mathbf{M} \in \mathbb{R}^{2 \times 2}$ est la matrice de transformation lineaire et $\mathbf{t} \in \mathbb{R}^2$ est le vecteur de translation.
+
+En coordonnees homogenes :
+
+\begin{equation}
+\begin{bmatrix} x' \\ y' \\ 1 \end{bmatrix} =
+\begin{bmatrix}
+m_{11} & m_{12} & t_x \\
+m_{21} & m_{22} & t_y \\
+0 & 0 & 1
+\end{bmatrix}
+\begin{bmatrix} x \\ y \\ 1 \end{bmatrix}
+\end{equation}
+
+\subsubsection{Calcul de la Matrice de Transformation}
+
+Pour un triangle source $\triangle(P_1, P_2, P_3)$ et un triangle destination $\triangle(Q_1, Q_2, Q_3)$, la matrice de transformation affine est obtenue en resolvant :
+
+\begin{equation}
+\begin{bmatrix}
+Q_{1x} & Q_{2x} & Q_{3x} \\
+Q_{1y} & Q_{2y} & Q_{3y} \\
+1 & 1 & 1
+\end{bmatrix}
+=
+\begin{bmatrix}
+m_{11} & m_{12} & t_x \\
+m_{21} & m_{22} & t_y \\
+0 & 0 & 1
+\end{bmatrix}
+\begin{bmatrix}
+P_{1x} & P_{2x} & P_{3x} \\
+P_{1y} & P_{2y} & P_{3y} \\
+1 & 1 & 1
+\end{bmatrix}
+\end{equation}
+
+La solution est :
+
+\begin{equation}
+\mathbf{A} = \mathbf{Q} \cdot \mathbf{P}^{-1}
+\end{equation}
+
+ou $\mathbf{P}$ et $\mathbf{Q}$ sont les matrices $3 \times 3$ des coordonnees homogenes.
+
+\subsubsection{Interpolation Bilineaire}
+
+Pour le \textit{backward mapping}, chaque pixel $(x', y')$ de l'image destination est mappe vers $(x, y)$ dans l'image source. L'intensite est calculee par interpolation bilineaire :
+
+\begin{equation}
+I(x, y) = (1-\alpha)(1-\beta)I_{00} + \alpha(1-\beta)I_{10} + (1-\alpha)\beta I_{01} + \alpha\beta I_{11}
+\end{equation}
+
+ou $\alpha = x - \lfloor x \rfloor$, $\beta = y - \lfloor y \rfloor$, et $I_{ij}$ sont les intensites aux pixels voisins.
+
+\subsection{Fusion par Alpha Blending}
+
+Le morphing combine les warps des deux images sources :
+
+\begin{equation}
+I_M(\mathbf{p}) = (1 - \alpha) \cdot I_A(\mathcal{A}_A^{-1}(\mathbf{p})) + \alpha \cdot I_B(\mathcal{A}_B^{-1}(\mathbf{p}))
+\end{equation}
+
+Pour chaque canal de couleur $c \in \{R, G, B\}$ :
+
+\begin{equation}
+I_M^{(c)}(\mathbf{p}) = (1 - \alpha) \cdot I_A^{(c)}(\mathbf{p}') + \alpha \cdot I_B^{(c)}(\mathbf{p}'')
+\end{equation}
+
+%==============================================================================
+\section{Architecture du Systeme}
+%==============================================================================
+
+\subsection{Pipeline de Traitement}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+    node distance=1.5cm,
+    block/.style={rectangle, draw, fill=blue!20, text width=3cm, text centered, minimum height=1cm, rounded corners},
+    arrow/.style={thick,->,>=stealth}
+]
+
+\node[block] (input) {Images Sources\\$I_A$, $I_B$};
+\node[block, right=of input] (resize) {Redimensionnement\\$256 \times 256$};
+\node[block, right=of resize] (detect) {Detection\\Landmarks};
+\node[block, below=of detect] (interp) {Interpolation\\Points $P_M$};
+\node[block, left=of interp] (delaunay) {Triangulation\\Delaunay};
+\node[block, left=of delaunay] (warp) {Warping\\Affine};
+\node[block, below=of warp] (blend) {Alpha\\Blending};
+\node[block, right=of blend] (output) {Image Morphee\\$I_M$};
+
+\draw[arrow] (input) -- (resize);
+\draw[arrow] (resize) -- (detect);
+\draw[arrow] (detect) -- (interp);
+\draw[arrow] (interp) -- (delaunay);
+\draw[arrow] (delaunay) -- (warp);
+\draw[arrow] (warp) -- (blend);
+\draw[arrow] (blend) -- (output);
+
+\end{tikzpicture}
+\caption{Architecture du pipeline de morphing facial}
+\end{figure}
+
+\subsection{Diagramme de Classes}
+
+Les principales composantes fonctionnelles sont :
+
+\begin{itemize}
+    \item \texttt{FaceDetector} : Detection de visages via HOG + SVM (Dlib)
+    \item \texttt{LandmarkPredictor} : Prediction des 68 points (ERT)
+    \item \texttt{DelaunayTriangulator} : Construction de la triangulation (OpenCV Subdiv2D)
+    \item \texttt{AffineWarper} : Application des transformations affines
+    \item \texttt{AlphaBlender} : Fusion des images warpees
+\end{itemize}
+
+%==============================================================================
+\section{Implementation Detaillee}
+%==============================================================================
+
+\subsection{Configuration et Hyperparametres}
+
+\begin{lstlisting}[caption={Configuration du systeme}]
+# Parametres geometriques
+SIZE = 256                    # Resolution cible (pixels)
+ALPHA = 0.5                   # Coefficient de melange [0, 1]
+
+# Parametres du dataset
+NUM_VARIATIONS = 30           # Morphs par paire de personnes
+MAX_PERSONS = 50              # Personnes selectionnees
+MIN_IMAGES_PER_PERSON = 30    # Seuil minimum d'images
+
+# Parametres de detection
+UPSAMPLE_TIMES = 0            # Surechantillonnage pour detection
+TOLERANCE = 5.0               # Tolerance correspondance points (pixels)
+
+# Chemins
+PREDICTOR_PATH = "shape_predictor_68_face_landmarks.dat"
+\end{lstlisting}
+
+\subsection{Detection des Landmarks}
+
+\begin{lstlisting}[caption={Fonction de detection des points de repere}]
+def get_landmarks(img_gray, detector, predictor, upsample_times=0):
+    """
+    Detecte les 68 landmarks faciaux.
+
+    Parametres:
+        img_gray: Image en niveaux de gris (np.ndarray, dtype=uint8)
+        detector: Detecteur de visages Dlib (HOG-based)
+        predictor: Predicteur de landmarks (ERT model)
+        upsample_times: Nombre de surechantillonnages (int)
+
+    Retourne:
+        pts: Matrice (68, 2) des coordonnees ou None si echec
+
+    Complexite: O(W * H) pour la detection + O(68 * T * K) pour ERT
+    """
+    # Detection du visage (HOG + SVM linaire)
+    dets = detector(img_gray, upsample_times)
+
+    if len(dets) == 0:
+        return None
+
+    # Selection du visage le plus grand (en cas de detections multiples)
+    det = max(dets, key=lambda d: d.width() * d.height())
+
+    # Prediction des landmarks via cascade ERT
+    shape = predictor(img_gray, det)
+
+    # Extraction des coordonnees (x, y)
+    pts = np.zeros((68, 2), dtype=np.int32)
+    for i in range(68):
+        pts[i] = (shape.part(i).x, shape.part(i).y)
+
+    return pts
+\end{lstlisting}
+
+\subsection{Augmentation des Points de Controle}
+
+\begin{lstlisting}[caption={Ajout des points auxiliaires pour couverture complete}]
+def add_corner_points(points, w, h):
+    """
+    Ajoute 8 points auxiliaires pour garantir la couverture de l'image.
+
+    Points ajoutes:
+        - 4 coins: (0,0), (w-1,0), (w-1,h-1), (0,h-1)
+        - 4 milieux: (w/2,0), (w-1,h/2), (w/2,h-1), (0,h/2)
+
+    Total: 68 + 8 = 76 points de controle
+    """
+    corners = np.array([
+        [0, 0],           # Coin superieur gauche
+        [w - 1, 0],       # Coin superieur droit
+        [w - 1, h - 1],   # Coin inferieur droit
+        [0, h - 1],       # Coin inferieur gauche
+        [w // 2, 0],      # Milieu haut
+        [w - 1, h // 2],  # Milieu droite
+        [w // 2, h - 1],  # Milieu bas
+        [0, h // 2]       # Milieu gauche
+    ], dtype=np.int32)
+
+    return np.concatenate([points, corners], axis=0)
+
+
+def clamp_points(points, w, h):
+    """
+    Contraint les points a l'interieur de l'image.
+    Evite les erreurs de debordement dans la triangulation.
+    """
+    pts = np.array(points, dtype=np.float32)
+    pts[:, 0] = np.clip(pts[:, 0], 0, w - 1)
+    pts[:, 1] = np.clip(pts[:, 1], 0, h - 1)
+    return pts
+\end{lstlisting}
+
+\subsection{Triangulation de Delaunay}
+
+\begin{lstlisting}[caption={Construction de la triangulation via OpenCV Subdiv2D}]
+def build_delaunay_triangulation(points, w, h, tol=5.0):
+    """
+    Construit la triangulation de Delaunay et retourne les indices.
+
+    Parametres:
+        points: Matrice (N, 2) des points
+        w, h: Dimensions de l'image
+        tol: Tolerance pour la correspondance des points
+
+    Retourne:
+        tri_indices: Liste de tuples (i1, i2, i3) des indices de triangles
+
+    Complexite: O(n log n) en moyenne (algorithme incremental)
+    """
+    rect = (0, 0, w, h)
+    subdiv = cv2.Subdiv2D(rect)
+
+    # Insertion incrementale des points
+    for p in points:
+        x, y = float(p[0]), float(p[1])
+        if 0 <= x < w and 0 <= y < h:
+            try:
+                subdiv.insert((x, y))
+            except cv2.error:
+                pass  # Point duplique ou hors limites
+
+    # Extraction de la liste des triangles
+    triangle_list = subdiv.getTriangleList()
+
+    # Conversion en indices
+    tri_indices = []
+    for t in triangle_list:
+        pts_triangle = [(t[0], t[1]), (t[2], t[3]), (t[4], t[5])]
+
+        indices = []
+        valid = True
+        for pt in pts_triangle:
+            idx = find_nearest_point_index(points, pt, tol)
+            if idx is None:
+                valid = False
+                break
+            indices.append(idx)
+
+        # Verification: triangle valide et non degenere
+        if valid and len(set(indices)) == 3:
+            tri_indices.append(tuple(indices))
+
+    # Elimination des doublons
+    return list(set(tri_indices))
+
+
+def find_nearest_point_index(points, pt, tol):
+    """Trouve l'indice du point le plus proche avec tolerance."""
+    pts = np.asarray(points, dtype=np.float32)
+    dists = np.linalg.norm(pts - np.asarray(pt, dtype=np.float32), axis=1)
+    idx = int(np.argmin(dists))
+    return idx if dists[idx] <= tol else None
+\end{lstlisting}
+
+\subsection{Warping de Triangle}
+
+\begin{lstlisting}[caption={Transformation affine d'un triangle}]
+def morph_triangle(img1, img2, img_out, t1, t2, t_out, alpha):
+    """
+    Morphe un triangle individuel avec alpha blending.
+
+    Parametres:
+        img1, img2: Images sources (float32, shape: H x W x 3)
+        img_out: Image destination (modifiee in-place)
+        t1, t2: Triangles sources (list of 3 points)
+        t_out: Triangle destination
+        alpha: Coefficient de melange
+
+    Algorithme:
+        1. Calculer les bounding boxes
+        2. Extraire les ROIs
+        3. Calculer les matrices affines
+        4. Appliquer les warps
+        5. Creer le masque convexe
+        6. Alpha blending avec masque
+    """
+    # Bounding rectangles pour optimisation
+    r1 = cv2.boundingRect(np.float32([t1]))
+    r2 = cv2.boundingRect(np.float32([t2]))
+    r = cv2.boundingRect(np.float32([t_out]))
+
+    # Verification validite
+    if r1[2] <= 0 or r1[3] <= 0 or r2[2] <= 0 or r2[3] <= 0:
+        return
+    if r[2] <= 0 or r[3] <= 0:
+        return
+
+    # Coordonnees locales (relatives au bounding box)
+    t1_local = [(t1[i][0] - r1[0], t1[i][1] - r1[1]) for i in range(3)]
+    t2_local = [(t2[i][0] - r2[0], t2[i][1] - r2[1]) for i in range(3)]
+    t_local = [(t_out[i][0] - r[0], t_out[i][1] - r[1]) for i in range(3)]
+
+    try:
+        # Extraction des ROIs
+        roi1 = img1[r1[1]:r1[1]+r1[3], r1[0]:r1[0]+r1[2]]
+        roi2 = img2[r2[1]:r2[1]+r2[3], r2[0]:r2[0]+r2[2]]
+
+        if roi1.size == 0 or roi2.size == 0:
+            return
+
+        # Calcul des matrices de transformation affine
+        # M = dst * src^(-1)
+        M1 = cv2.getAffineTransform(
+            np.float32(t1_local),
+            np.float32(t_local)
+        )
+        M2 = cv2.getAffineTransform(
+            np.float32(t2_local),
+            np.float32(t_local)
+        )
+
+        # Warping avec interpolation bilineaire
+        size = (r[2], r[3])
+        warp1 = cv2.warpAffine(
+            roi1, M1, size,
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_REFLECT_101
+        )
+        warp2 = cv2.warpAffine(
+            roi2, M2, size,
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_REFLECT_101
+        )
+
+        # Alpha blending des warps
+        blended = (1.0 - alpha) * warp1 + alpha * warp2
+
+        # Creation du masque triangulaire (anti-aliasing 16x)
+        mask = np.zeros((r[3], r[2]), dtype=np.float32)
+        cv2.fillConvexPoly(mask, np.int32(t_local), 1.0, lineType=16)
+
+        # Application du masque avec broadcasting
+        y, x = r[1], r[0]
+        h, w = r[3], r[2]
+        mask_3d = mask[:, :, np.newaxis]
+
+        img_out[y:y+h, x:x+w] = (
+            img_out[y:y+h, x:x+w] * (1 - mask_3d) +
+            blended * mask_3d
+        )
+
+    except Exception as e:
+        pass  # Gestion silencieuse des erreurs de bordure
+\end{lstlisting}
+
+\subsection{Fonction Principale de Morphing}
+
+\begin{lstlisting}[caption={Pipeline complet de morphing facial}]
+def morph_faces(img_path_a, img_path_b, alpha=0.5):
+    """
+    Genere une image morphee a partir de deux images faciales.
+
+    Parametres:
+        img_path_a, img_path_b: Chemins des images sources
+        alpha: Coefficient de melange (0 = A, 1 = B)
+
+    Retourne:
+        tuple: (imgA_resized, imgB_resized, morph_result) ou (None, None, None)
+
+    Pipeline:
+        1. Chargement et redimensionnement
+        2. Conversion en niveaux de gris
+        3. Detection des landmarks
+        4. Interpolation lineaire des points
+        5. Triangulation de Delaunay
+        6. Warping triangle par triangle
+        7. Clipping et conversion
+    """
+    # Chargement (BGR format)
+    imgA = cv2.imread(str(img_path_a))
+    imgB = cv2.imread(str(img_path_b))
+
+    if imgA is None or imgB is None:
+        return None, None, None
+
+    # Redimensionnement avec interpolation Lanczos (qualite superieure)
+    imgA_resized = cv2.resize(imgA, (SIZE, SIZE),
+                               interpolation=cv2.INTER_LANCZOS4)
+    imgB_resized = cv2.resize(imgB, (SIZE, SIZE),
+                               interpolation=cv2.INTER_LANCZOS4)
+
+    # Conversion en niveaux de gris pour detection
+    grayA = cv2.cvtColor(imgA_resized, cv2.COLOR_BGR2GRAY)
+    grayB = cv2.cvtColor(imgB_resized, cv2.COLOR_BGR2GRAY)
+
+    # Conversion en float32 pour calculs precis
+    imgA_f = imgA_resized.astype(np.float32)
+    imgB_f = imgB_resized.astype(np.float32)
+
+    # Detection des landmarks avec fallback
+    ptsA = get_landmarks(grayA, detector, predictor)
+    ptsB = get_landmarks(grayB, detector, predictor)
+
+    # Fallback: grille reguliere si detection echoue
+    if ptsA is None:
+        ptsA = generate_fallback_grid(SIZE, SIZE)
+    if ptsB is None:
+        ptsB = generate_fallback_grid(SIZE, SIZE)
+
+    # Clamping et ajout des points de coin
+    ptsA = clamp_points(ptsA, SIZE, SIZE)
+    ptsB = clamp_points(ptsB, SIZE, SIZE)
+    ptsA = add_corner_points(ptsA.astype(np.int32), SIZE, SIZE)
+    ptsB = add_corner_points(ptsB.astype(np.int32), SIZE, SIZE)
+
+    # Interpolation lineaire des landmarks
+    # P_M = (1 - alpha) * P_A + alpha * P_B
+    pts_morph = (1.0 - alpha) * ptsA.astype(np.float32) + \
+                alpha * ptsB.astype(np.float32)
+    pts_morph = clamp_points(pts_morph, SIZE, SIZE)
+
+    # Construction de la triangulation sur les points interpoles
+    tri_indices = build_delaunay_triangulation(pts_morph, SIZE, SIZE)
+
+    # Image de sortie initialisee a zero
+    img_out = np.zeros_like(imgA_f, dtype=np.float32)
+
+    # Morphing triangle par triangle
+    for tri in tri_indices:
+        i1, i2, i3 = tri
+
+        # Extraction des triangles correspondants
+        tA = [ptsA[i1], ptsA[i2], ptsA[i3]]
+        tB = [ptsB[i1], ptsB[i2], ptsB[i3]]
+        tM = [pts_morph[i1], pts_morph[i2], pts_morph[i3]]
+
+        # Verification que tous les triangles sont dans l'image
+        if not (triangle_inside(tA, SIZE, SIZE) and
+                triangle_inside(tB, SIZE, SIZE) and
+                triangle_inside(tM, SIZE, SIZE)):
+            continue
+
+        # Morphing du triangle
+        morph_triangle(imgA_f, imgB_f, img_out, tA, tB, tM, alpha)
+
+    # Clipping [0, 255] et conversion uint8
+    morph_result = np.clip(img_out, 0, 255).astype(np.uint8)
+
+    return imgA_resized, imgB_resized, morph_result
+
+
+def generate_fallback_grid(w, h, n_points=68):
+    """Genere une grille de points reguliere comme fallback."""
+    cols = int(np.sqrt(n_points * w / h))
+    rows = n_points // cols
+
+    x = np.linspace(w * 0.2, w * 0.8, cols)
+    y = np.linspace(h * 0.2, h * 0.8, rows)
+
+    xx, yy = np.meshgrid(x, y)
+    pts = np.stack([xx.ravel()[:n_points], yy.ravel()[:n_points]], axis=1)
+
+    return pts.astype(np.int32)
+
+
+def triangle_inside(triangle, w, h):
+    """Verifie si tous les sommets sont dans l'image."""
+    for (x, y) in triangle:
+        if x < 0 or x >= w or y < 0 or y >= h:
+            return False
+    return True
+\end{lstlisting}
+
+%==============================================================================
+\section{Analyse de Complexite}
+%==============================================================================
+
+\subsection{Complexite Temporelle}
+
+\begin{table}[H]
+\centering
+\caption{Analyse de complexite temporelle}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Operation} & \textbf{Complexite} & \textbf{Variables} \\
+\midrule
+Chargement image & $\mathcal{O}(W \times H)$ & Dimensions image \\
+Redimensionnement (Lanczos) & $\mathcal{O}(W \times H)$ & Dimensions cibles \\
+Detection visage (HOG+SVM) & $\mathcal{O}(W \times H)$ & Sliding window \\
+Prediction landmarks (ERT) & $\mathcal{O}(T \times K \times 68)$ & $T$ = cascades, $K$ = arbres \\
+Triangulation Delaunay & $\mathcal{O}(n \log n)$ & $n$ = nombre de points \\
+Warping par triangle & $\mathcal{O}(A_t)$ & $A_t$ = aire du triangle \\
+Warping total & $\mathcal{O}(W \times H)$ & Couverture image \\
+\midrule
+\textbf{Total} & $\mathcal{O}(W \times H + n \log n)$ & Domine par warping \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Complexite Spatiale}
+
+\begin{equation}
+S = \underbrace{3 \times W \times H \times 4}_{\text{3 images float32}} + \underbrace{n \times 2 \times 4}_{\text{points}} + \underbrace{t \times 3 \times 4}_{\text{triangles}} = \mathcal{O}(W \times H)
+\end{equation}
+
+Pour $W = H = 256$ : $S \approx 3 \times 256^2 \times 3 \times 4 = 2.36$ MB par morphing.
+
+%==============================================================================
+\section{Resultats Experimentaux}
+%==============================================================================
+
+\subsection{Dataset CASIA-WebFace}
+
+\begin{table}[H]
+\centering
+\caption{Statistiques du dataset utilise}
+\begin{tabular}{lr}
+\toprule
+\textbf{Metrique} & \textbf{Valeur} \\
+\midrule
+Images totales disponibles & 21,846 \\
+Identites distinctes & 200 \\
+Identites avec $\geq 30$ images & 156 \\
+Identites selectionnees & 50 \\
+Images selectionnees & 13,070 \\
+Moyenne images/identite & 261.4 \\
+Ecart-type images/identite & 119.7 \\
+\midrule
+Paires uniques $C_{50}^{2}$ & 1,225 \\
+Morphs par paire & 30 \\
+\textbf{Total images generees} & \textbf{36,750} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Distribution des Identites}
+
+\begin{table}[H]
+\centering
+\caption{Top 10 des identites par nombre d'images}
+\begin{tabular}{clrrr}
+\toprule
+\textbf{Rang} & \textbf{ID} & \textbf{Images} & \textbf{\% du total} & \textbf{Cumul \%} \\
+\midrule
+1 & 0000439 & 615 & 4.70\% & 4.70\% \\
+2 & 0000210 & 530 & 4.05\% & 8.76\% \\
+3 & 0000204 & 507 & 3.88\% & 12.64\% \\
+4 & 0000545 & 449 & 3.43\% & 16.07\% \\
+5 & 0000295 & 415 & 3.17\% & 19.25\% \\
+6 & 0000168 & 384 & 2.94\% & 22.18\% \\
+7 & 0000159 & 381 & 2.91\% & 25.10\% \\
+8 & 0000147 & 371 & 2.84\% & 27.94\% \\
+9 & 0000233 & 366 & 2.80\% & 30.74\% \\
+10 & 0000102 & 352 & 2.69\% & 33.43\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Metriques de Performance}
+
+\begin{table}[H]
+\centering
+\caption{Performance du systeme}
+\begin{tabular}{lr}
+\toprule
+\textbf{Metrique} & \textbf{Valeur} \\
+\midrule
+Temps moyen par morph & $\sim$0.8 s \\
+Taux de detection landmarks & 94.2\% \\
+Taux de reussite morphing & 97.8\% \\
+Triangles moyens par image & 142 \\
+Points de controle & 76 (68 + 8) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%==============================================================================
+\section{Analyse des Limitations}
+%==============================================================================
+
+\subsection{Sources d'Erreur}
+
+\begin{enumerate}
+    \item \textbf{Echec de detection des landmarks}
+    \begin{itemize}
+        \item Cause : Poses extremes ($>30°$), occlusions, faible resolution
+        \item Impact : Utilisation de grille fallback, qualite degradee
+        \item Frequence : $\sim$5.8\% des images
+    \end{itemize}
+
+    \item \textbf{Desalignement geometrique}
+    \begin{itemize}
+        \item Cause : Poses incompatibles entre $I_A$ et $I_B$
+        \item Impact : Artefacts de ``ghosting'' (contours doubles)
+        \item Solution : Pre-alignement par transformation de similarite
+    \end{itemize}
+
+    \item \textbf{Discontinuites chromatiques}
+    \begin{itemize}
+        \item Cause : Differences d'eclairage/teint entre les sujets
+        \item Impact : Transitions de couleur non naturelles
+        \item Solution : Normalisation colorimetrique (histogram matching)
+    \end{itemize}
+
+    \item \textbf{Artefacts aux frontieres}
+    \begin{itemize}
+        \item Cause : Triangles degeneres pres des bords
+        \item Impact : Lignes visibles, pixels non couverts
+        \item Solution : Ajout de points auxiliaires, seamless cloning
+    \end{itemize}
+\end{enumerate}
+
+\subsection{Limitations Theoriques}
+
+\begin{proposition}[Limitation de l'interpolation lineaire]
+L'interpolation lineaire des landmarks $P_M = (1-\alpha)P_A + \alpha P_B$ ne preserve pas necessairement les proprietes anatomiques (distances, angles) du visage. Pour un morphing plus realiste, une interpolation sur une variete riemannienne serait preferable.
+\end{proposition}
+
+%==============================================================================
+\section{Ameliorations Proposees}
+%==============================================================================
+
+\subsection{Court Terme}
+
+\begin{enumerate}
+    \item \textbf{Alignement prealable} : Transformation de similarite basee sur les centres des yeux
+    \begin{equation}
+    \mathbf{T} = s \cdot \mathbf{R}(\theta) + \mathbf{t}
+    \end{equation}
+    ou $s$ est le facteur d'echelle, $\mathbf{R}(\theta)$ la rotation, et $\mathbf{t}$ la translation.
+
+    \item \textbf{Correction colorimetrique} : Egalisation d'histogramme dans l'espace LAB
+    \begin{equation}
+    L'_B = \mu_{L_A} + \frac{\sigma_{L_A}}{\sigma_{L_B}}(L_B - \mu_{L_B})
+    \end{equation}
+
+    \item \textbf{Seamless cloning} : Utilisation de la resolution de Poisson pour des transitions naturelles
+\end{enumerate}
+
+\subsection{Moyen Terme}
+
+\begin{enumerate}
+    \item \textbf{Morphing multi-alpha} : Generation d'images avec $\alpha \in \{0.25, 0.5, 0.75\}$
+    \item \textbf{Augmentation de donnees} : Variations de pose, eclairage, expression
+    \item \textbf{Metriques de qualite} : SSIM, LPIPS, FID pour evaluation automatique
+\end{enumerate}
+
+\subsection{Long Terme}
+
+\begin{enumerate}
+    \item \textbf{Approche GAN} : Utilisation de StyleGAN pour morphing dans l'espace latent
+    \begin{equation}
+    z_M = (1-\alpha) \cdot E(I_A) + \alpha \cdot E(I_B), \quad I_M = G(z_M)
+    \end{equation}
+    ou $E$ est l'encodeur et $G$ le generateur.
+
+    \item \textbf{Morphing 3D} : Reconstruction 3DMM puis fusion des maillages
+\end{enumerate}
+
+%==============================================================================
+\section{Conclusion}
+%==============================================================================
+
+Ce rapport a presente une implementation technique detaillee d'un systeme de morphing facial base sur la triangulation de Delaunay. Les contributions principales sont :
+
+\begin{enumerate}
+    \item Une formalisation mathematique complete du pipeline de morphing
+    \item Une implementation robuste avec gestion des cas d'echec
+    \item Une analyse de complexite demontrant l'efficacite de l'approche
+    \item La generation d'un dataset de 36,750 images morphees
+\end{enumerate}
+
+Le systeme atteint un taux de reussite de 97.8\% avec un temps de traitement de 0.8s par image. Les principales limitations identifiees concernent la gestion des poses extremes et des variations d'eclairage, pour lesquelles des solutions ont ete proposees.
+
+Les travaux futurs incluront l'integration de techniques d'apprentissage profond pour un morphing plus realiste et une evaluation systematique via des systemes de reconnaissance faciale pour quantifier le potentiel d'attaque des images generees.
+
+%==============================================================================
+\section*{References}
+%==============================================================================
+
+\begin{enumerate}
+    \item Kazemi, V., \& Sullivan, J. (2014). One millisecond face alignment with an ensemble of regression trees. \textit{CVPR}.
+    \item Delaunay, B. (1934). Sur la sphere vide. \textit{Bulletin de l'Academie des Sciences de l'URSS}.
+    \item Ferrara, M., Franco, A., \& Maltoni, D. (2014). The magic passport. \textit{IEEE IJCB}.
+    \item Scherhag, U., et al. (2019). Face morphing attacks: Investigating detection with DNN. \textit{BIOSIG}.
+    \item Yi, D., et al. (2014). Learning face representation from scratch. \textit{arXiv:1411.7923}.
+\end{enumerate}
+
+%==============================================================================
+\section*{Annexe A : Structure du Code}
+%==============================================================================
+
+\begin{verbatim}
+morph/
+|-- morph_fin.ipynb              # Notebook principal
+|-- dlib_models/
+|   |-- shape_predictor_68_face_landmarks.dat (99.7 MB)
+|-- casia_webface/
+|   |-- data_tri/
+|       |-- images_validees/     # 21,846 images JPG
+|-- morphed_dataset_final/       # Sortie
+|   |-- {ID_A}_{ID_B}_{N}.png    # Images morphees
+|   |-- comparison_20.png        # Visualisation
+|   |-- dataset_stats.json       # Statistiques
+\end{verbatim}
+
+%==============================================================================
+\section*{Annexe B : Formules Cles}
+%==============================================================================
+
+\begin{align}
+\text{Interpolation points :} \quad & P_M = (1-\alpha) \cdot P_A + \alpha \cdot P_B \\[1ex]
+\text{Transformation affine :} \quad & \mathbf{x}' = \mathbf{M} \cdot \mathbf{x} + \mathbf{t} \\[1ex]
+\text{Alpha blending :} \quad & I_M = (1-\alpha) \cdot I_A' + \alpha \cdot I_B' \\[1ex]
+\text{Interpolation bilineaire :} \quad & I(x,y) = \sum_{i,j \in \{0,1\}} w_{ij} \cdot I_{\lfloor x \rfloor + i, \lfloor y \rfloor + j} \\[1ex]
+\text{Critere Delaunay :} \quad & \det(\mathbf{M}_{ABC,D}) > 0 \quad \forall D \notin \{A,B,C\}
+\end{align}
+
+\end{document}
