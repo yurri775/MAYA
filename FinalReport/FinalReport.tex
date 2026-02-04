@@ -4,6 +4,7 @@
 \usepackage[french]{babel}
 \usepackage{amsmath,amsfonts,amssymb}
 \usepackage{graphicx}
+
 \usepackage{listings}
 \usepackage{xcolor}
 \usepackage{hyperref}
@@ -43,15 +44,15 @@
 
 \title{
     \vspace{-2cm}
-    \textbf{Rapport Technique Global}\\[0.2cm]
+    \textbf{Rapport Technique Global / PART 2}\\[0.2cm]
     \Large{Morphing de Visages, Classification sur Identit\'es Fictives\\
     et Attaque de Type Membership Inference (MIA)}
 }
 \author{
-    Projet de Recherche en Vision par Ordinateur\\
+    Projet de Recherche\\
     \small{Morphing, Reconnaissance Faciale et Vie Priv\'ee}
 }
-\date{\today}
+%\date{\today}
 
 \begin{document}
 
@@ -69,11 +70,12 @@ g\'en\'erer un grand dataset fictif (\texttt{big\_dataset\_alpha}). Dans une
 seconde phase, nous repartons d'identit\'es r\'eelles issues de LFW et construisons
 un dataset synth\'etique \texttt{big\_dataset\_lfw} \`a partir d'images morph\'ees.
 Un MobileNetV2 pr\'e-entra\^\i{}n\'e sur ImageNet est ensuite adapt\'e \`a la t\^ache de
-reconnaissance d'identit\'es fictives. Enfin, nous pr\'eparons et analysons une
-attaque MIA visant \`a distinguer les images ayant servi \`a l'entra\^\i{}nement de
-celles utilis\'ees uniquement en test. Le rapport insiste \'egalement sur les
-difficult\'es rencontr\'ees (\'ech\'ecs de d\'etection de landmarks, poses extr\^emes,
-probl\'emes de split pour MIA) et les solutions mises en place.
+reconnaissance d'identit\'es fictives. 
+%Enfin, nous pr\'eparons et analysons une
+%attaque MIA visant \`a distinguer les images ayant servi \`a l'entra\^\i{}nement de
+%celles utilis\'ees uniquement en test. Le rapport insiste \'egalement sur les
+%difficult\'es rencontr\'ees (\'ech\'ecs de d\'etection de landmarks, poses extr\^emes,
+%probl\'emes de split pour MIA) et les solutions mises en place.
 \end{abstract}
 
 \tableofcontents
@@ -290,17 +292,7 @@ triptyque $(A_i, C_i, B_i)$. Le script
 \texttt{create\_lfw\_triptychs.py} enregistre ces panneaux dans
 \texttt{..\lfw\_morph\_comparison/}.
 
-\begin{figure}[H]
-  \centering
-  % Exemple de triptyques A|C|B
-  \includegraphics[width=0.9\textwidth]{../lfw_morph_comparison/morph_lfw_01_02/panel_img_001__img_001__a050_pair01.png}\\[4pt]
-  \includegraphics[width=0.9\textwidth]{../lfw_morph_comparison/morph_lfw_03_04/panel_img_001__img_001__a050_pair01.png}\\[4pt]
-  \includegraphics[width=0.9\textwidth]{../lfw_morph_comparison/morph_lfw_05_06/panel_img_002__img_002__a050_pair02.png}
-  \caption{Exemples de triptyques $A \mid C \mid B$ (gauche : donneur~A,
-           centre : morph $C$ avec $\alpha = 0{,}5$, droite : donneur~B)
-           pour quelques paires d'identit\'es LFW.}
-  \label{fig:lfw-triptychs}
-\end{figure}
+
 
 Ces figures servent de \og preuve visuelle \fg{} de la qualit\'e des morphs
 fournis et de base \`a la construction du dataset synth\'etique
@@ -336,7 +328,82 @@ Le dataset complet \texttt{big\_dataset\_lfw} contient ainsi
 \]
 
 Les identit\'es sont inf\'er\'ees \`a partir du pr\'efixe du nom de fichier
-(avent les suffixes \texttt{\_orig} / \texttt{\_augXXX}).
+(avant les suffixes \\texttt{\\_orig} / \\texttt{\\_augXXX}).
+
+Pour rendre plus concret le lien entre les donneurs r\'eels $A$, $B$ et
+les identit\'es synth\'etiques $C$, la figure~\ref{fig:lfw-donors-morphs}
+montre, pour quelques paires d'identit\'es LFW s\'electionn\'ees,
+une image source de chaque donneur et un morph $C$ correspondant
+issu directement de \texttt{big\_dataset\_lfw}.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{C:/Users/papaa/Desktop/FACEMOMO/lfw_morph_comparison/image.png}
+  \caption{Image de comparaison des morphs LFW}
+  \label{fig:image-morph}
+\end{figure}
+
+
+\begin{figure}[H]
+  \centering
+  % Paire (01,02)
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../images/lfw_person_01/img_001.png}
+    \caption*{Donneur A (01, img\_001)}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../big_dataset_lfw/morph_lfw_01_02__img_001__img_001__a050_pair01_aug001.png}
+    \caption*{Morph C (01,02, img\_001)}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../images/lfw_person_02/img_001.png}
+    \caption*{Donneur B (02, img\_001)}
+  \end{subfigure}\\[0.3cm]
+
+  % Paire (03,04)
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../images/lfw_person_03/img_001.png}
+    \caption*{Donneur A (03, img\_001)}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../big_dataset_lfw/morph_lfw_03_04__img_001__img_001__a050_pair01_aug001.png}
+    \caption*{Morph C (03,04, img\_001)}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../images/lfw_person_04/img_001.png}
+    \caption*{Donneur B (04, img\_001)}
+  \end{subfigure}\\[0.3cm]
+
+  % Paire (05,06)
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../images/lfw_person_05/img_001.png}
+    \caption*{Donneur A (05, img\_001)}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../big_dataset_lfw/morph_lfw_05_06__img_001__img_001__a050_pair01_aug001.png}
+    \caption*{Morph C (05,06, img\_001)}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.32\textwidth}
+    \centering
+    \includegraphics[width=\textwidth]{../images/lfw_person_06/img_001.png}
+    \caption*{Donneur B (06, img\_001)}
+  \end{subfigure}
+
+  \caption{Exemples de triptyques $A \mid C \mid B$ construits
+           \`a partir des images LFW originales (donneurs) et des
+           morphs interm\'ediaires $C$ effectivement utilis\'es dans
+           le dataset \texttt{big\_dataset\_lfw}.}
+  \label{fig:lfw-donors-morphs}
+\end{figure}
+
 
 \subsection{T\^ache de classification}
 
@@ -421,159 +488,5 @@ performance, mais de garantir un split compatible avec la suite MIA~:
 \section{Pr\'eparation et R\'esultats de l'Attaque MIA}
 %==============================================================================
 %
-\subsection{Principe de l’attaque Membership Inference}
-
-Une attaque de type Membership Inference Attack (MIA) cherche \`a
-savoir, pour une image $x$, si celle-ci a servi \`a l'entra\^\i{}nement
-du mod\`ele (\og member \fg) ou si elle n'a \'et\'e vue qu'en test (\og
-non-member \fg). Intuitivement, un mod\`ele trop confiant et trop
-\og sur-appris \fg{} aura tendance \`a produire des pr\'edictions
-plus \og s\^ures \fg{} (confiance \'elev\'ee, faible loss) sur les
-exemples d'entra\^\i{}nement que sur les exemples de test.
-
-Dans notre cas, nous disposons d\'ej\`a de la s\'eparation exacte :
-\begin{itemize}
-  \item \texttt{train\_indices} : indices des images ayant servi \`a
-        l'entra\^\i{}nement (members) ;
-  \item \texttt{val\_indices} : indices des images de validation/
-        test (non-members).
-\end{itemize}
-
-L'attaque retenue est une attaque na\:ive par seuil sur la perte :
-\begin{enumerate}
-  \item pour chaque image du dataset, nous calculons la
-        cross-entropie entre la sortie du mod\`ele et le label vrai ;
-  \item nous construisons la distribution des pertes pour les
-        membres et pour les non-membres ;
-  \item nous balayons un ensemble de seuils $\tau$ possibles et,
-        pour chacun, nous d\'ecidons 
-        \og member \fg{} si $\text{loss}(x) \le \tau$,
-        \og non-member \fg{} sinon ;
-  \item nous choisissons le seuil qui maximise l’exactitude de
-        l’attaque ou la \emph{balanced accuracy}
-        (moyenne de TPR et TNR).
-\end{enumerate}
-
-\subsection{Mise en place pratique}
-
-Le script \texttt{mia\_attack.py} r\'ealise les \'etapes suivantes :
-\begin{itemize}
-  \item chargement du dataset \texttt{big\_dataset\_lfw} avec une
-        transformation de validation (redimensionnement +
-        recadrage central $224\times 224$, normalisation) ;
-  \item chargement du mod\`ele entra\^\i{}n\'e
-        \texttt{mobilenet\_big\_dataset\_alpha.pth} ;
-  \item calcul, pour chaque image, de la cross-entropie et de la
-        confiance maximale (max softmax) ;
-  \item s\'eparation des pertes en deux vecteurs :
-        \texttt{member\_losses} (indices train) et
-        \texttt{nonmember\_losses} (indices val) ;
-  \item balayage de seuils pour trouver $\tau^\star$ qui maximise
-        la balanced accuracy.
-\end{itemize}
-
-\subsection{R\'esultats obtenus et objectif atteint}
-
-Avec le split par identit\'e d\'ecrit plus haut (environ 1500 members
-et 500 non-members), nous obtenons typiquement :
-\begin{itemize}
-  \item moyenne des pertes membres $\mu_\text{mem} \approx 0{,}021$ ;
-  \item moyenne des pertes non-members $\mu_\text{non} \approx 0{,}031$ ;
-  \item meilleur seuil $\tau^\star \approx 0{,}16$ sur la loss ;
-  \item \textbf{balanced accuracy} $\approx 50{,}6\,\%$ ;
-  \item TPR tr\`es \'elev\'ee mais TNR tr\`es faible (l’attaquant
-        confond la plupart des non-membres avec des membres).
-\end{itemize}
-
-L'objectif du projet \'etait d'obtenir une balanced accuracy
-\emph{inf\'erieure ou \'egale \`a 55\,\%} pour l'attaque MIA, c'est-\`a-dire
-une attaque proche du hasard (50\,\%). Le r\'esultat obtenu
-($\approx 50{,}6\,\%$) satisfait donc cette contrainte :
-dans ces conditions, l'attaque na\:ive par seuil sur la loss
-n'arrive pas vraiment \`a distinguer les membres des non-membres.
-
-\subsection{Difficult\'es sp\'ecifiques \`a MIA}
-
-Sur cette partie, la difficult\'e principale a \'et\'e de comprendre
-comment le choix du split et du dataset influen\c{c}ait la puissance
-de l'attaque :
-\begin{itemize}
-  \item avec des splits inadapt\'es (par exemple des identit\'es
-        compl\`etes dans le train mais absentes du test, ou l’inverse),
-        on peut donner un avantage artificiel \`a l’attaquant ;
-  \item il a fallu v\'erifier que la \emph{balanced accuracy} \'etait
-        bien mesur\'ee sur un ensemble \'equilibr\'e members / non-membres,
-        pour ne pas se laisser tromper par une accuracy globale
-        domin\'ee par la classe majoritaire.
-\end{itemize}
-
-Apr\`es plusieurs essais et corrections du split, nous avons obtenu un
-sc\'enario coh\'erent o\`u l’attaque MIA na\:ive reste proche du hasard,
-malgr\'e un mod\`ele de classification quasi parfait.
-
-%==============================================================================
-\section{Synth\`ese et Perspectives}
-%==============================================================================
-
-\subsection{Bilan global}
-
-Le projet a permis de mettre en place un pipeline complet allant :
-\begin{itemize}
-  \item du morphing g\'eom\'etrique de visages (landmarks dlib,
-        triangulation de Delaunay, warping affine, masque de visage,
-        alpha-blending) ;
-  \item \`a la g\'en\'eration de grands jeux de donn\'ees de visages
-        fictifs (\texttt{big\_dataset\_alpha} puis
-        \texttt{big\_dataset\_lfw}) ;
-  \item \`a l'entra\^\i{}nement d'un MobileNetV2 pour la reconnaissance
-        d'identit\'es synth\'etiques (250 classes, 2000 images) ;
-  \item jusqu'\`a la mise en \oe uvre et l'analyse d'une attaque
-        Membership Inference, avec un objectif explicite de
-        balanced accuracy $\le 55\,\%$.
-\end{itemize}
-
-Les r\'esultats obtenus montrent qu'il est possible :
-\begin{enumerate}
-  \item de g\'en\'erer des morphs visuellement plausibles en grande
-        quantit\'e, \`a condition de filtrer les paires trop extr\^emes ;
-  \item d'entra\^\i{}ner rapidement un CNN l\'eger qui atteint
-        $100\,\%$ de pr\'ecision sur la t\^ache de classification
-        d'identit\'es fictives ;
-  \item de concevoir un protocole MIA o\`u, malgr\'e ce tr\`es bon score
-        de classification, l'attaque na\:ive par seuil sur la loss
-        reste proche du hasard.
-\end{enumerate}
-
-\subsection{Perspectives d’am\'elioration}
-
-Plusieurs pistes d'am\'elioration ou d'extensions sont possibles :
-\begin{itemize}
-  \item \textbf{Morphing plus avanc\'e} : int\'egrer des mod\`eles
-        g\'en\'eratifs (GANs, diffusion) pour corriger les artefacts
-        du morphing g\'eom\'etrique et \og r\'einventer \fg{} les
-        d\'etails manquants (cheveux, texture de peau, arri\`ere-plan) ;
-  \item \textbf{Morphing 3D} : utiliser un mod\`ele 3DMM pour reconstruire
-        une g\'eom\'etrie 3D du visage avant morphing, ce qui faciliterait
-        la gestion des poses extr\^emes ;
-  \item \textbf{Attaques MIA plus sophistiqu\'ees} : au-del\`a d’un simple
-        seuil sur la loss, tester des attaques apprises (entra\^\i{}ner un
-        \og mod\`ele attaquant \fg{} sur des features comme la loss,
-        la confiance, l’entropie de la sortie, etc.) ;
-  \item \textbf{\'Etude syst\'ematique du compromis
-        performance / confidentialit\'e} : faire varier la taille du
-        mod\`ele, le degr\'e de r\'egularisation, la taille du dataset,
-        et observer l’impact conjoint sur la pr\'ecision de
-        classification et sur la puissance d’une MIA.
-\end{itemize}
-
-\bigskip
-
-En conclusion, le projet a permis d'explorer de bout en bout la cha\^\i{}ne
-\emph{morphing $\rightarrow$ dataset fictif $\rightarrow$
-CNN de reconnaissance $\rightarrow$ attaque MIA}, en partant de
-prototypes simples de morphing pour aboutir \`a un sc\'enario exp\'erimental
-complet, reproductible et riche en enseignements \`a la fois sur la
-qualit\'e visuelle des morphs et sur les questions de vie priv\'ee li\'ees
-\`a l'entra\^\i{}nement des mod\`eles.
 
 \end{document}
