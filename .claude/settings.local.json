@@ -7,7 +7,14 @@
       "Bash(git remote add:*)",
       "Bash(python:*)",
       "Bash(git commit:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(git push:*)",
+      "WebFetch(domain:www.robots.ox.ac.uk)",
+      "Bash(kaggle:*)",
+      "Bash(pip install:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(timeout:*)",
+      "Bash(powershell -Command:*)"
     ]
   }
 }

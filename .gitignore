@@ -52,3 +52,6 @@ dlib_models/*.dat
 .DS_Store
 Thumbs.db
 desktop.ini
+casia_webface/ 
+morphed_dataset_final/ 
+nul 

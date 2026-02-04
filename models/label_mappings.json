@@ -1,0 +1,34 @@
+{
+  "label_to_idx": {
+    "Angelina_Jolie": 0,
+    "Brad_Pitt": 1,
+    "Denzel_Washington": 2,
+    "Hugh_Jackman": 3,
+    "Jennifer_Lawrence": 4,
+    "Kate_Winslet": 5,
+    "Leonardo_DiCaprio": 6,
+    "Megan_Fox": 7,
+    "Natalie_Portman": 8,
+    "Sandra_Bullock": 9,
+    "Scarlett_Johansson": 10,
+    "Tom_Cruise": 11,
+    "Tom_Hanks": 12,
+    "Will_Smith": 13
+  },
+  "idx_to_label": {
+    "0": "Angelina_Jolie",
+    "1": "Brad_Pitt",
+    "2": "Denzel_Washington",
+    "3": "Hugh_Jackman",
+    "4": "Jennifer_Lawrence",
+    "5": "Kate_Winslet",
+    "6": "Leonardo_DiCaprio",
+    "7": "Megan_Fox",
+    "8": "Natalie_Portman",
+    "9": "Sandra_Bullock",
+    "10": "Scarlett_Johansson",
+    "11": "Tom_Cruise",
+    "12": "Tom_Hanks",
+    "13": "Will_Smith"
+  }
+}
