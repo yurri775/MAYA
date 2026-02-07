@@ -1,7 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(git commit -m \"$\\(cat <<''EOF''\n✨ Ajout des échantillons de démonstration et fonctionnalités SynMorph\n\nNouvelles fonctionnalités:\n- 📊 Dossier sample_data/ avec échantillons prêts à présenter\n- 🎨 5 paires d''images avant/après morphing\n- 📸 Comparaisons visuelles côte-à-côte\n- 🔬 Documentation SynMorph \\(arXiv:2409.05595\\)\n- 🚀 Script generate_samples.py pour créer des démos\n- 📝 READMEs détaillés pour chaque composant\n\nAméliorations:\n- README principal mis à jour avec nouvelle structure\n- Documentation complète des fonctionnalités du papier\n- Roadmap d''implémentation des features avancées\n- Comparaison avec l''état de l''art\n\nFichiers ajoutés:\n- generate_samples.py \\(générateur d''échantillons\\)\n- SYNMORPH_FEATURES.md \\(documentation technique\\)\n- sample_data/ \\(échantillons de démonstration\\)\n- sample_data/README.md \\(guide des échantillons\\)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
-    ]
-  }
-}
